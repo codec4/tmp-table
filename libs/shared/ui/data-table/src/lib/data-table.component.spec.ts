@@ -155,6 +155,30 @@ describe('data table components', () => {
     }
   });
 
+  it('recalculates virtual scroll height from measured row heights', async () => {
+    const restoreIntersectionObserver = installMockIntersectionObserver();
+    const getBoundingClientRect = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect');
+
+    getBoundingClientRect.mockImplementation(function (this: HTMLElement) {
+      return this.dataset['virtualRowKey']?.startsWith('parent:') ? rectWithHeight(30) : rectWithHeight(0);
+    });
+
+    try {
+      await TestBed.configureTestingModule({
+        imports: [VirtualScrollHostComponent]
+      }).compileComponents();
+
+      const fixture = TestBed.createComponent(VirtualScrollHostComponent);
+      await render(fixture);
+      await flushVirtualMeasurements(fixture);
+
+      expect(virtualScrollSpaceFor(fixture).style.height).toBe('440px');
+    } finally {
+      getBoundingClientRect.mockRestore();
+      restoreIntersectionObserver();
+    }
+  });
+
   it('keeps optional child rows with their parent rows while virtual scrolling', async () => {
     const restoreIntersectionObserver = installMockIntersectionObserver();
 
@@ -276,6 +300,13 @@ const render = async (fixture: ComponentFixture<unknown>): Promise<void> => {
   fixture.detectChanges();
 };
 
+const flushVirtualMeasurements = async (fixture: ComponentFixture<unknown>): Promise<void> => {
+  await new Promise(resolve => setTimeout(resolve, 0));
+  fixture.detectChanges();
+  await fixture.whenStable();
+  fixture.detectChanges();
+};
+
 const createRows = (count: number): TestRow[] =>
   Array.from({ length: count }, (_, index) => ({
     id: index + 1,
@@ -363,4 +394,20 @@ const setClientHeight = (element: HTMLElement, clientHeight: number): void => {
     configurable: true,
     value: clientHeight
   });
+};
+
+const rectWithHeight = (height: number): DOMRect => {
+  const rect = {
+    bottom: height,
+    height,
+    left: 0,
+    right: 0,
+    top: 0,
+    width: 0,
+    x: 0,
+    y: 0,
+    toJSON: () => ({})
+  };
+
+  return rect as DOMRect;
 };

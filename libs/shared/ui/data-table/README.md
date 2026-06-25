@@ -25,11 +25,11 @@ Use the virtualized table component when the row set is large:
 ```
 
 `lib-data-table-virtual-scroll` uses `IntersectionObserver` sentinels inside the body scroll container, estimated row
-heights, and a fixed-height scroll space to keep only the active window plus overscan in the DOM. The rendered row
-window is translated inside that stable scroll space so the scrollbar thumb keeps the same cursor mapping while
-dragging. When `childRowTemplateKey` is provided, the detail child row is rendered directly after its parent, so virtual
-scrolling keeps each parent and child row together. Use `childRowWhen` when only some parent rows have child row
-content. Tune `rowHeight` and `childRowHeight` to match the rendered row heights so the scrollbar thumb stays stable
-during fast wheel scrolling or thumb dragging.
+heights, measured rendered row heights, and a fixed-height scroll space to keep only the active window plus overscan in
+the DOM. The rendered row window is translated inside that stable scroll space so the scrollbar thumb keeps the same
+cursor mapping while dragging. When `childRowTemplateKey` is provided, the detail child row is rendered directly after
+its parent, so virtual scrolling keeps each parent and child row together. Use `childRowWhen` when only some parent rows
+have child row content. `rowHeight` and `childRowHeight` are initial estimates for rows that have not been rendered yet;
+the component measures visible parent and child rows and uses those measurements for subsequent scroll math.
 
 Run `nx test data-table` to execute the unit tests.

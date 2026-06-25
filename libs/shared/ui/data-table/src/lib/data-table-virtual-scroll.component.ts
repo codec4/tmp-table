@@ -1,5 +1,6 @@
 import { NgTemplateOutlet } from '@angular/common';
 import {
+  AfterViewChecked,
   ChangeDetectionStrategy,
   ChangeDetectorRef,
   Component,
@@ -112,7 +113,10 @@ const DEFAULT_CHILD_ROW_HEIGHT = 57;
               </colgroup>
               <tbody class="divide-y divide-slate-100">
                 @for (row of visibleRows(); track rowKey(row, virtualRowIndex(rowIndex)); let rowIndex = $index) {
-                  <tr class="hover:bg-slate-50" [style.height.px]="parentRowHeight()">
+                  <tr
+                    class="hover:bg-slate-50"
+                    [attr.data-virtual-row-key]="rowMeasurementKey(row, virtualRowIndex(rowIndex), 'parent')"
+                  >
                     @for (column of tableColumns(); track column.key) {
                       <td class="max-w-80 truncate px-4 py-3 text-slate-700" title="{{ row[column.key] ?? '' }}">
                         @if (templateFor(column); as template) {
@@ -134,7 +138,10 @@ const DEFAULT_CHILD_ROW_HEIGHT = 57;
                     }
                   </tr>
                   @if (childRowTemplateFor(row, virtualRowIndex(rowIndex)); as childTemplate) {
-                    <tr class="bg-slate-200/80" [style.height.px]="resolvedChildRowHeight()">
+                    <tr
+                      class="bg-slate-200/80"
+                      [attr.data-virtual-row-key]="rowMeasurementKey(row, virtualRowIndex(rowIndex), 'child')"
+                    >
                       <td class="border-t border-slate-100 px-4 py-3 text-slate-600" [attr.colspan]="colspan()">
                         <ng-container
                           *ngTemplateOutlet="
@@ -169,7 +176,7 @@ const DEFAULT_CHILD_ROW_HEIGHT = 57;
   `,
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class DataTableVirtualScrollComponent<T extends Record<string, unknown>> implements OnDestroy {
+export class DataTableVirtualScrollComponent<T extends Record<string, unknown>> implements AfterViewChecked, OnDestroy {
   private readonly injectedRows = inject<Signal<T[]> | null>(TABLE_DATA, {
     optional: true
   });
@@ -181,9 +188,12 @@ export class DataTableVirtualScrollComponent<T extends Record<string, unknown>> 
   private readonly changeDetectorRef = inject(ChangeDetectorRef);
   private readonly ngZone = inject(NgZone);
   private intersectionObserver?: IntersectionObserver;
+  private resizeObserver?: ResizeObserver;
   private scrollRootElement?: HTMLElement;
   private topSentinelElement?: HTMLElement;
   private bottomSentinelElement?: HTMLElement;
+  private observedRowElements = new Set<HTMLElement>();
+  private measurementTimer?: ReturnType<typeof setTimeout>;
 
   readonly data = input<T[] | null>(null);
   readonly columns = input<ColumnDef<T>[] | null>(null);
@@ -199,14 +209,16 @@ export class DataTableVirtualScrollComponent<T extends Record<string, unknown>> 
 
   private readonly scrollTop = signal(0);
   private readonly viewportHeight = signal(0);
+  private readonly measuredHeights = signal<Record<string, number>>({});
 
   private readonly rowsLayout = computed<VirtualRowsLayout>(() => {
     const rows = this.rows();
+    const measuredHeights = this.measuredHeights();
     const offsets = [0];
     let totalHeight = 0;
 
     for (let index = 0; index < rows.length; index++) {
-      totalHeight += this.estimatedRowHeight(rows[index], index);
+      totalHeight += this.virtualItemHeight(rows[index], index, measuredHeights);
       offsets.push(totalHeight);
     }
 
@@ -266,6 +278,10 @@ export class DataTableVirtualScrollComponent<T extends Record<string, unknown>> 
     });
   }
 
+  ngAfterViewChecked(): void {
+    this.scheduleRenderedRowsMeasurement();
+  }
+
   @ViewChild('scrollRoot')
   set scrollRoot(scrollRoot: ElementRef<HTMLElement> | undefined) {
     this.scrollRootElement = scrollRoot?.nativeElement;
@@ -285,7 +301,13 @@ export class DataTableVirtualScrollComponent<T extends Record<string, unknown>> 
   }
 
   ngOnDestroy(): void {
+    if (this.measurementTimer !== undefined) {
+      clearTimeout(this.measurementTimer);
+      this.measurementTimer = undefined;
+    }
+
     this.disconnectObserver();
+    this.disconnectResizeObserver();
   }
 
   rows(): T[] {
@@ -325,16 +347,12 @@ export class DataTableVirtualScrollComponent<T extends Record<string, unknown>> 
     return `translateY(${this.topSpacerHeight()}px)`;
   }
 
-  parentRowHeight(): number {
-    return positiveNumber(this.rowHeight(), DEFAULT_ROW_HEIGHT);
-  }
-
-  resolvedChildRowHeight(): number {
-    return positiveNumber(this.childRowHeight(), DEFAULT_CHILD_ROW_HEIGHT);
-  }
-
   virtualRowIndex(visibleRowIndex: number): number {
     return this.virtualRange().start + visibleRowIndex;
+  }
+
+  rowMeasurementKey(row: T, index: number, part: 'parent' | 'child'): string {
+    return `${part}:${this.rowKey(row, index)}`;
   }
 
   childRowTemplateFor(row: T, rowIndex: number): TemplateRef<unknown> | undefined {
@@ -410,6 +428,12 @@ export class DataTableVirtualScrollComponent<T extends Record<string, unknown>> 
     this.intersectionObserver = undefined;
   }
 
+  private disconnectResizeObserver(): void {
+    this.resizeObserver?.disconnect();
+    this.resizeObserver = undefined;
+    this.observedRowElements.clear();
+  }
+
   private syncViewport(): void {
     const scrollRoot = this.scrollRootElement;
 
@@ -421,12 +445,137 @@ export class DataTableVirtualScrollComponent<T extends Record<string, unknown>> 
     this.viewportHeight.set(scrollRoot.clientHeight);
   }
 
-  private estimatedRowHeight(row: T, rowIndex: number): number {
+  private scheduleRenderedRowsMeasurement(): void {
+    if (this.measurementTimer !== undefined) {
+      return;
+    }
+
+    this.measurementTimer = setTimeout(() => {
+      this.measurementTimer = undefined;
+      this.measureRenderedRows();
+    }, 0);
+  }
+
+  private measureRenderedRows(): void {
+    const scrollRoot = this.scrollRootElement;
+
+    if (!scrollRoot) {
+      return;
+    }
+
+    const rowElements = Array.from(scrollRoot.querySelectorAll<HTMLElement>('[data-virtual-row-key]'));
+
+    this.observeRenderedRows(rowElements);
+    this.applyMeasuredHeights(
+      rowElements.map(rowElement => ({
+        height: this.heightForElement(rowElement),
+        key: rowElement.dataset['virtualRowKey']
+      }))
+    );
+  }
+
+  private observeRenderedRows(rowElements: HTMLElement[]): void {
+    const Observer = globalThis.ResizeObserver;
+
+    if (!Observer) {
+      return;
+    }
+
+    if (!this.resizeObserver) {
+      this.ngZone.runOutsideAngular(() => {
+        this.resizeObserver = new Observer(entries => {
+          const measurements = entries.map(entry => {
+            const element = entry.target as HTMLElement;
+
+            return {
+              height: this.heightForElement(element, entry),
+              key: element.dataset['virtualRowKey']
+            };
+          });
+
+          this.ngZone.run(() => {
+            this.applyMeasuredHeights(measurements);
+          });
+        });
+      });
+    }
+
+    const nextObservedElements = new Set(rowElements);
+
+    for (const observedElement of this.observedRowElements) {
+      if (!nextObservedElements.has(observedElement)) {
+        this.resizeObserver?.unobserve(observedElement);
+      }
+    }
+
+    for (const rowElement of nextObservedElements) {
+      if (!this.observedRowElements.has(rowElement)) {
+        this.resizeObserver?.observe(rowElement);
+      }
+    }
+
+    this.observedRowElements = nextObservedElements;
+  }
+
+  private applyMeasuredHeights(measurements: Array<{ height: number | null; key: string | undefined }>): void {
+    let changed = false;
+
+    this.measuredHeights.update(currentHeights => {
+      let nextHeights = currentHeights;
+
+      for (const measurement of measurements) {
+        if (!measurement.key || measurement.height === null) {
+          continue;
+        }
+
+        const currentHeight = currentHeights[measurement.key];
+
+        if (currentHeight !== undefined && Math.abs(currentHeight - measurement.height) < 0.5) {
+          continue;
+        }
+
+        if (nextHeights === currentHeights) {
+          nextHeights = { ...currentHeights };
+        }
+
+        nextHeights[measurement.key] = measurement.height;
+        changed = true;
+      }
+
+      return nextHeights;
+    });
+
+    if (!changed) {
+      return;
+    }
+
+    this.syncViewport();
+    this.changeDetectorRef.markForCheck();
+  }
+
+  private heightForElement(element: HTMLElement, entry?: ResizeObserverEntry): number | null {
+    const borderBoxSize = entry?.borderBoxSize;
+    const firstBorderBoxSize = Array.isArray(borderBoxSize) ? borderBoxSize[0] : borderBoxSize;
+    const height = Math.max(
+      firstBorderBoxSize?.blockSize ?? 0,
+      entry?.contentRect.height ?? 0,
+      element.getBoundingClientRect().height,
+      element.offsetHeight
+    );
+
+    return Number.isFinite(height) && height > 0 ? height : null;
+  }
+
+  private virtualItemHeight(row: T, rowIndex: number, measuredHeights: Record<string, number>): number {
+    const parentHeight =
+      measuredHeights[this.rowMeasurementKey(row, rowIndex, 'parent')] ??
+      positiveNumber(this.rowHeight(), DEFAULT_ROW_HEIGHT);
     const childHeight = this.hasChildRow(row, rowIndex)
-      ? positiveNumber(this.childRowHeight(), DEFAULT_CHILD_ROW_HEIGHT)
+      ? (measuredHeights[this.rowMeasurementKey(row, rowIndex, 'child')] ??
+        positiveNumber(this.childRowHeight(), DEFAULT_CHILD_ROW_HEIGHT))
       : 0;
 
-    return positiveNumber(this.rowHeight(), DEFAULT_ROW_HEIGHT) + childHeight;
+    return parentHeight + childHeight;
   }
 
   private hasChildRow(row: T, rowIndex: number): boolean {
