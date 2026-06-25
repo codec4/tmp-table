@@ -174,14 +174,14 @@ import { EMPTY_ROWS, resolveColumnSource } from './data-table.utils';
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class DataTableVirtualScrollComponent<T extends Record<string, unknown>> {
-  private readonly injectedRows = inject<Signal<T[]> | null>(TABLE_DATA, {
+  readonly #injectedRows = inject<Signal<T[]> | null>(TABLE_DATA, {
     optional: true
   });
-  private readonly injectedColumns = inject<TableColumnSource<T>>(COLUMNS);
-  private readonly injectedLoading = inject<Signal<boolean> | null>(TABLE_LOADING, {
+  readonly #injectedColumns = inject<TableColumnSource<T>>(COLUMNS);
+  readonly #injectedLoading = inject<Signal<boolean> | null>(TABLE_LOADING, {
     optional: true
   });
-  private readonly templatesRegistry = inject(TABLE_TEMPLATES);
+  readonly #templatesRegistry = inject(TABLE_TEMPLATES);
 
   readonly data = input<T[] | null>(null);
   readonly columns = input<ColumnDef<T>[] | null>(null);
@@ -197,13 +197,13 @@ export class DataTableVirtualScrollComponent<T extends Record<string, unknown>> 
 
   readonly virtualRows = computed(() =>
     this.rows().map((row, index) => ({
-      hasChildRow: this.hasChildRow(row, index),
+      hasChildRow: this.#hasChildRow(row, index),
       key: this.rowKey(row, index)
     }))
   );
 
   rows(): T[] {
-    return this.data() ?? this.injectedRows?.() ?? (EMPTY_ROWS as T[]);
+    return this.data() ?? this.#injectedRows?.() ?? (EMPTY_ROWS as T[]);
   }
 
   tableColumns(): ColumnDef<T>[] {
@@ -213,17 +213,17 @@ export class DataTableVirtualScrollComponent<T extends Record<string, unknown>> 
       return columns;
     }
 
-    return resolveColumnSource(this.injectedColumns);
+    return resolveColumnSource(this.#injectedColumns);
   }
 
   isLoading(): boolean {
-    return this.loading() ?? this.injectedLoading?.() ?? false;
+    return this.loading() ?? this.#injectedLoading?.() ?? false;
   }
 
   templateFor(column: { key: string; templateKey?: string }): TemplateRef<unknown> | undefined {
     return (
-      (column.templateKey ? this.templatesRegistry.get(column.templateKey) : undefined) ??
-      this.templatesRegistry.get(column.key)
+      (column.templateKey ? this.#templatesRegistry.get(column.templateKey) : undefined) ??
+      this.#templatesRegistry.get(column.key)
     );
   }
 
@@ -264,7 +264,7 @@ export class DataTableVirtualScrollComponent<T extends Record<string, unknown>> 
       return undefined;
     }
 
-    return this.templatesRegistry.get(templateKey);
+    return this.#templatesRegistry.get(templateKey);
   }
 
   rowKey(row: T, index: number): string {
@@ -279,7 +279,7 @@ export class DataTableVirtualScrollComponent<T extends Record<string, unknown>> 
     return id === undefined || id === null ? row : String(id);
   }
 
-  private hasChildRow(row: T, rowIndex: number): boolean {
+  #hasChildRow(row: T, rowIndex: number): boolean {
     if (!this.childRowTemplateKey()) {
       return false;
     }

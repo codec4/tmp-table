@@ -5,23 +5,23 @@ import { DataTableVirtualScrollControllerDirective } from './data-table-virtual-
   selector: '[dataTableVirtualScrollSentinel]'
 })
 export class DataTableVirtualScrollSentinelDirective implements OnDestroy {
-  private readonly elementRef = inject<ElementRef<HTMLElement>>(ElementRef);
-  private readonly controller = inject(DataTableVirtualScrollControllerDirective);
-  private readonly ngZone = inject(NgZone);
-  private intersectionObserver?: IntersectionObserver;
+  readonly #elementRef = inject<ElementRef<HTMLElement>>(ElementRef);
+  readonly #controller = inject(DataTableVirtualScrollControllerDirective);
+  readonly #ngZone = inject(NgZone);
+  #intersectionObserver?: IntersectionObserver;
 
   constructor() {
     effect(() => {
-      this.connectObserver(this.controller.scrollRootElement(), this.controller.rootMargin());
+      this.#connectObserver(this.#controller.scrollRootElement(), this.#controller.rootMargin());
     });
   }
 
   ngOnDestroy(): void {
-    this.disconnectObserver();
+    this.#disconnectObserver();
   }
 
-  private connectObserver(scrollRoot: HTMLElement | null, rootMargin: string): void {
-    this.disconnectObserver();
+  #connectObserver(scrollRoot: HTMLElement | null, rootMargin: string): void {
+    this.#disconnectObserver();
 
     if (!scrollRoot) {
       return;
@@ -33,15 +33,15 @@ export class DataTableVirtualScrollSentinelDirective implements OnDestroy {
       return;
     }
 
-    this.ngZone.runOutsideAngular(() => {
-      this.intersectionObserver = new Observer(
+    this.#ngZone.runOutsideAngular(() => {
+      this.#intersectionObserver = new Observer(
         entries => {
           if (!entries.some(entry => entry.isIntersecting)) {
             return;
           }
 
-          this.ngZone.run(() => {
-            this.controller.syncViewportFromRoot();
+          this.#ngZone.run(() => {
+            this.#controller.syncViewportFromRoot();
           });
         },
         {
@@ -51,12 +51,12 @@ export class DataTableVirtualScrollSentinelDirective implements OnDestroy {
         }
       );
 
-      this.intersectionObserver.observe(this.elementRef.nativeElement);
+      this.#intersectionObserver.observe(this.#elementRef.nativeElement);
     });
   }
 
-  private disconnectObserver(): void {
-    this.intersectionObserver?.disconnect();
-    this.intersectionObserver = undefined;
+  #disconnectObserver(): void {
+    this.#intersectionObserver?.disconnect();
+    this.#intersectionObserver = undefined;
   }
 }

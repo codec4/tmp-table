@@ -22,14 +22,14 @@ import type {
   selector: '[dataTableVirtualScrollController]'
 })
 export class DataTableVirtualScrollControllerDirective {
-  private readonly changeDetectorRef = inject(ChangeDetectorRef);
-  private readonly scrollTop = signal(0);
-  private readonly viewportHeight = signal(0);
-  private readonly measuredHeights = signal<Record<string, number>>({});
-  private readonly renderedRowsHeight = signal(0);
-  private readonly isPointerActive = signal(false);
-  private readonly isScrolling = signal(false);
-  private pendingMeasurements: VirtualRowMeasurement[] = [];
+  readonly #changeDetectorRef = inject(ChangeDetectorRef);
+  readonly #scrollTop = signal(0);
+  readonly #viewportHeight = signal(0);
+  readonly #measuredHeights = signal<Record<string, number>>({});
+  readonly #renderedRowsHeight = signal(0);
+  readonly #isPointerActive = signal(false);
+  readonly #isScrolling = signal(false);
+  #pendingMeasurements: VirtualRowMeasurement[] = [];
 
   readonly rows = input<VirtualScrollRow[]>([], {
     alias: 'dataTableVirtualScrollRows'
@@ -55,7 +55,7 @@ export class DataTableVirtualScrollControllerDirective {
   readonly layout = computed<VirtualRowsLayout>(() =>
     calculateVirtualRowsLayout({
       childRowHeight: this.childRowHeight(),
-      measuredHeights: this.measuredHeights(),
+      measuredHeights: this.#measuredHeights(),
       rowHeight: this.rowHeight(),
       rows: this.rows()
     })
@@ -67,8 +67,8 @@ export class DataTableVirtualScrollControllerDirective {
       layout: this.layout(),
       overscanRows: this.overscanRows(),
       rowHeight: this.rowHeight(),
-      scrollTop: this.scrollTop(),
-      viewportHeight: this.viewportHeight()
+      scrollTop: this.#scrollTop(),
+      viewportHeight: this.#viewportHeight()
     })
   );
 
@@ -76,9 +76,9 @@ export class DataTableVirtualScrollControllerDirective {
     calculateVirtualTopOffset({
       layout: this.layout(),
       range: this.range(),
-      renderedRowsHeight: this.renderedRowsHeight(),
-      scrollTop: this.scrollTop(),
-      viewportHeight: this.viewportHeight()
+      renderedRowsHeight: this.#renderedRowsHeight(),
+      scrollTop: this.#scrollTop(),
+      viewportHeight: this.#viewportHeight()
     })
   );
 
@@ -96,8 +96,8 @@ export class DataTableVirtualScrollControllerDirective {
   }
 
   syncViewport(scrollTop: number, viewportHeight: number): void {
-    this.scrollTop.set(scrollTop);
-    this.viewportHeight.set(viewportHeight);
+    this.#scrollTop.set(scrollTop);
+    this.#viewportHeight.set(viewportHeight);
   }
 
   syncViewportFromRoot(): void {
@@ -108,75 +108,75 @@ export class DataTableVirtualScrollControllerDirective {
     }
 
     this.syncViewport(scrollRoot.scrollTop, scrollRoot.clientHeight);
-    this.changeDetectorRef.markForCheck();
+    this.#changeDetectorRef.markForCheck();
   }
 
   beginScroll(): void {
-    this.isScrolling.set(true);
+    this.#isScrolling.set(true);
   }
 
   endScroll(): void {
-    this.isScrolling.set(false);
+    this.#isScrolling.set(false);
 
-    if (!this.isPointerActive()) {
-      this.flushPendingMeasurements();
+    if (!this.#isPointerActive()) {
+      this.#flushPendingMeasurements();
     }
   }
 
   beginPointer(): void {
-    this.isPointerActive.set(true);
+    this.#isPointerActive.set(true);
   }
 
   endPointer(): void {
-    if (!this.isPointerActive()) {
+    if (!this.#isPointerActive()) {
       return;
     }
 
-    this.isPointerActive.set(false);
+    this.#isPointerActive.set(false);
 
-    if (!this.isScrolling()) {
-      this.flushPendingMeasurements();
+    if (!this.#isScrolling()) {
+      this.#flushPendingMeasurements();
     }
   }
 
   recordRenderedMeasurements(measurements: VirtualRowMeasurement[]): void {
-    this.updateRenderedRowsHeight(measurements);
+    this.#updateRenderedRowsHeight(measurements);
 
-    if (this.isScrolling() || this.isPointerActive()) {
-      this.pendingMeasurements.push(...measurements);
+    if (this.#isScrolling() || this.#isPointerActive()) {
+      this.#pendingMeasurements.push(...measurements);
       return;
     }
 
-    this.commitMeasuredHeights(measurements);
+    this.#commitMeasuredHeights(measurements);
   }
 
-  private updateRenderedRowsHeight(measurements: VirtualRowMeasurement[]): void {
+  #updateRenderedRowsHeight(measurements: VirtualRowMeasurement[]): void {
     const height = calculateRenderedRowsHeight(measurements);
 
-    if (!height || Math.abs(this.renderedRowsHeight() - height) < 0.5) {
+    if (!height || Math.abs(this.#renderedRowsHeight() - height) < 0.5) {
       return;
     }
 
-    this.renderedRowsHeight.set(height);
+    this.#renderedRowsHeight.set(height);
   }
 
-  private flushPendingMeasurements(): void {
-    if (!this.pendingMeasurements.length) {
+  #flushPendingMeasurements(): void {
+    if (!this.#pendingMeasurements.length) {
       return;
     }
 
-    const measurements = this.pendingMeasurements;
-    this.pendingMeasurements = [];
-    this.commitMeasuredHeights(measurements);
+    const measurements = this.#pendingMeasurements;
+    this.#pendingMeasurements = [];
+    this.#commitMeasuredHeights(measurements);
   }
 
-  private commitMeasuredHeights(measurements: VirtualRowMeasurement[]): void {
+  #commitMeasuredHeights(measurements: VirtualRowMeasurement[]): void {
     const scrollRoot = this.scrollRootElement();
     const previousTotalHeight = this.totalHeight();
     const previousScrollTop = scrollRoot?.scrollTop ?? 0;
     let changed = false;
 
-    this.measuredHeights.update(currentHeights => {
+    this.#measuredHeights.update(currentHeights => {
       let nextHeights = currentHeights;
 
       for (const measurement of measurements) {
@@ -215,6 +215,6 @@ export class DataTableVirtualScrollControllerDirective {
     }
 
     this.syncViewportFromRoot();
-    this.changeDetectorRef.markForCheck();
+    this.#changeDetectorRef.markForCheck();
   }
 }

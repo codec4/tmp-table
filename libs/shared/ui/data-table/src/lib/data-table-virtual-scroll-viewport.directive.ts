@@ -6,38 +6,38 @@ import { DataTableVirtualScrollControllerDirective } from './data-table-virtual-
   selector: '[dataTableVirtualScrollViewport]'
 })
 export class DataTableVirtualScrollViewportDirective implements OnDestroy {
-  private readonly elementRef = inject<ElementRef<HTMLElement>>(ElementRef);
-  private readonly controller = inject(DataTableVirtualScrollControllerDirective);
-  private scrollIdleTimer?: ReturnType<typeof setTimeout>;
+  readonly #elementRef = inject<ElementRef<HTMLElement>>(ElementRef);
+  readonly #controller = inject(DataTableVirtualScrollControllerDirective);
+  #scrollIdleTimer?: ReturnType<typeof setTimeout>;
 
   constructor() {
     afterNextRender(() => {
-      this.controller.setScrollRoot(this.elementRef.nativeElement);
+      this.#controller.setScrollRoot(this.#elementRef.nativeElement);
     });
   }
 
   ngOnDestroy(): void {
-    if (this.scrollIdleTimer !== undefined) {
-      clearTimeout(this.scrollIdleTimer);
-      this.scrollIdleTimer = undefined;
+    if (this.#scrollIdleTimer !== undefined) {
+      clearTimeout(this.#scrollIdleTimer);
+      this.#scrollIdleTimer = undefined;
     }
 
-    this.controller.endScroll();
-    this.controller.clearScrollRoot(this.elementRef.nativeElement);
+    this.#controller.endScroll();
+    this.#controller.clearScrollRoot(this.#elementRef.nativeElement);
   }
 
   @HostListener('scroll')
   onScroll(): void {
-    this.controller.beginScroll();
-    this.controller.syncViewportFromRoot();
+    this.#controller.beginScroll();
+    this.#controller.syncViewportFromRoot();
 
-    if (this.scrollIdleTimer !== undefined) {
-      clearTimeout(this.scrollIdleTimer);
+    if (this.#scrollIdleTimer !== undefined) {
+      clearTimeout(this.#scrollIdleTimer);
     }
 
-    this.scrollIdleTimer = setTimeout(() => {
-      this.scrollIdleTimer = undefined;
-      this.controller.endScroll();
+    this.#scrollIdleTimer = setTimeout(() => {
+      this.#scrollIdleTimer = undefined;
+      this.#controller.endScroll();
     }, SCROLL_IDLE_MEASUREMENT_DELAY_MS);
   }
 
@@ -46,13 +46,13 @@ export class DataTableVirtualScrollViewportDirective implements OnDestroy {
   @HostListener('document:mousedown')
   @HostListener('document:pointerdown')
   onPointerDown(): void {
-    this.controller.beginPointer();
+    this.#controller.beginPointer();
   }
 
   @HostListener('document:pointercancel')
   @HostListener('document:pointerup')
   @HostListener('document:mouseup')
   onPointerRelease(): void {
-    this.controller.endPointer();
+    this.#controller.endPointer();
   }
 }
