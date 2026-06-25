@@ -1,22 +1,17 @@
 import { NgTemplateOutlet } from '@angular/common';
+import { ChangeDetectionStrategy, Component, Signal, TemplateRef, computed, inject, input } from '@angular/core';
+import { DataTableVirtualScrollControllerDirective } from './data-table-virtual-scroll-controller.directive';
+import { DataTableVirtualScrollMeasureDirective } from './data-table-virtual-scroll-measure.directive';
 import {
-  AfterViewChecked,
-  ChangeDetectionStrategy,
-  ChangeDetectorRef,
-  Component,
-  ElementRef,
-  HostListener,
-  NgZone,
-  OnDestroy,
-  Signal,
-  TemplateRef,
-  ViewChild,
-  computed,
-  effect,
-  inject,
-  input,
-  signal
-} from '@angular/core';
+  DEFAULT_VIRTUAL_SCROLL_CHILD_ROW_HEIGHT,
+  DEFAULT_VIRTUAL_SCROLL_INITIAL_ROWS,
+  DEFAULT_VIRTUAL_SCROLL_OVERSCAN_ROWS,
+  DEFAULT_VIRTUAL_SCROLL_ROW_HEIGHT,
+  virtualRowMeasurementKey
+} from './data-table-virtual-scroll.math';
+import type { VirtualRowPart, VirtualRowsRange } from './data-table-virtual-scroll.math';
+import { DataTableVirtualScrollSentinelDirective } from './data-table-virtual-scroll-sentinel.directive';
+import { DataTableVirtualScrollViewportDirective } from './data-table-virtual-scroll-viewport.directive';
 import {
   COLUMNS,
   ColumnDef,
@@ -26,27 +21,29 @@ import {
   TABLE_TEMPLATES,
   TableColumnSource
 } from './data-table.tokens';
-import {
-  DEFAULT_VIRTUAL_SCROLL_CHILD_ROW_HEIGHT,
-  DEFAULT_VIRTUAL_SCROLL_INITIAL_ROWS,
-  DEFAULT_VIRTUAL_SCROLL_OVERSCAN_ROWS,
-  DEFAULT_VIRTUAL_SCROLL_ROW_HEIGHT,
-  SCROLL_IDLE_MEASUREMENT_DELAY_MS,
-  calculatePreservedScrollTop,
-  calculateRenderedRowsHeight,
-  calculateVirtualRange,
-  calculateVirtualRowsLayout,
-  calculateVirtualTopOffset,
-  virtualRowMeasurementKey
-} from './data-table-virtual-scroll.math';
-import type { VirtualRowMeasurement, VirtualRowPart, VirtualRowsLayout } from './data-table-virtual-scroll.math';
 import { EMPTY_ROWS, resolveColumnSource } from './data-table.utils';
 
 @Component({
   selector: 'lib-data-table-virtual-scroll',
-  imports: [NgTemplateOutlet],
+  imports: [
+    NgTemplateOutlet,
+    DataTableVirtualScrollControllerDirective,
+    DataTableVirtualScrollMeasureDirective,
+    DataTableVirtualScrollSentinelDirective,
+    DataTableVirtualScrollViewportDirective
+  ],
   template: `
-    <div class="relative overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+    <div
+      class="relative overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"
+      dataTableVirtualScrollController
+      #virtualScroll="dataTableVirtualScrollController"
+      [dataTableVirtualScrollRows]="virtualRows()"
+      [dataTableVirtualScrollInitialRows]="initialRows()"
+      [dataTableVirtualScrollOverscanRows]="overscanRows()"
+      [dataTableVirtualScrollRowHeight]="rowHeight()"
+      [dataTableVirtualScrollChildRowHeight]="childRowHeight()"
+      [dataTableVirtualScrollRootMargin]="rootMargin()"
+    >
       <table class="sticky top-0 z-20 w-full min-w-full table-fixed border-separate border-spacing-0 text-sm">
         <colgroup>
           @for (column of tableColumns(); track column.key) {
@@ -83,26 +80,24 @@ import { EMPTY_ROWS, resolveColumnSource } from './data-table.utils';
         </table>
       } @else {
         <div
-          #scrollRoot
           class="relative overflow-auto"
           data-testid="table-scroll-root"
+          dataTableVirtualScrollViewport
           [style.max-height]="height()"
           style="overflow-anchor: none"
-          (mousedown)="onScrollPointerDown()"
-          (pointerdown)="onScrollPointerDown()"
-          (scroll)="onScroll()"
         >
           <div
             class="relative min-w-full overflow-hidden"
             data-testid="virtual-scroll-space"
-            [style.height.px]="totalHeight()"
+            [style.height.px]="virtualScroll.totalHeight()"
           >
-            <div #topVirtualSentinel class="absolute left-0 top-0 h-px w-px" aria-hidden="true"></div>
-            <div #bottomVirtualSentinel class="absolute bottom-0 left-0 h-px w-px" aria-hidden="true"></div>
+            <div class="absolute left-0 top-0 h-px w-px" dataTableVirtualScrollSentinel aria-hidden="true"></div>
+            <div class="absolute bottom-0 left-0 h-px w-px" dataTableVirtualScrollSentinel aria-hidden="true"></div>
 
             <table
               class="absolute left-0 top-0 w-full min-w-full table-fixed border-separate border-spacing-0 text-sm will-change-transform"
-              [style.transform]="bodyTransform()"
+              dataTableVirtualScrollMeasure
+              [style.transform]="bodyTransform(virtualScroll.topOffset())"
             >
               <colgroup>
                 @for (column of tableColumns(); track column.key) {
@@ -110,10 +105,12 @@ import { EMPTY_ROWS, resolveColumnSource } from './data-table.utils';
                 }
               </colgroup>
               <tbody class="divide-y divide-slate-100">
-                @for (row of visibleRows(); track rowKey(row, virtualRowIndex(rowIndex)); let rowIndex = $index) {
+                @for (row of visibleRows(virtualScroll.range()); track trackRow(row); let rowIndex = $index) {
                   <tr
                     class="hover:bg-slate-50"
-                    [attr.data-virtual-row-key]="rowMeasurementKey(row, virtualRowIndex(rowIndex), 'parent')"
+                    [attr.data-virtual-row-key]="
+                      rowMeasurementKey(row, virtualRowIndex(rowIndex, virtualScroll.range()), 'parent')
+                    "
                   >
                     @for (column of tableColumns(); track column.key) {
                       <td class="max-w-80 truncate px-4 py-3 text-slate-700" title="{{ row[column.key] ?? '' }}">
@@ -135,10 +132,12 @@ import { EMPTY_ROWS, resolveColumnSource } from './data-table.utils';
                       </td>
                     }
                   </tr>
-                  @if (childRowTemplateFor(row, virtualRowIndex(rowIndex)); as childTemplate) {
+                  @if (childRowTemplateFor(row, virtualRowIndex(rowIndex, virtualScroll.range())); as childTemplate) {
                     <tr
                       class="bg-slate-200/80"
-                      [attr.data-virtual-row-key]="rowMeasurementKey(row, virtualRowIndex(rowIndex), 'child')"
+                      [attr.data-virtual-row-key]="
+                        rowMeasurementKey(row, virtualRowIndex(rowIndex, virtualScroll.range()), 'child')
+                      "
                     >
                       <td class="border-t border-slate-100 px-4 py-3 text-slate-600" [attr.colspan]="colspan()">
                         <ng-container
@@ -147,7 +146,7 @@ import { EMPTY_ROWS, resolveColumnSource } from './data-table.utils';
                             context: {
                               $implicit: row,
                               row: row,
-                              rowIndex: virtualRowIndex(rowIndex)
+                              rowIndex: virtualRowIndex(rowIndex, virtualScroll.range())
                             }
                           "
                         />
@@ -174,7 +173,7 @@ import { EMPTY_ROWS, resolveColumnSource } from './data-table.utils';
   `,
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class DataTableVirtualScrollComponent<T extends Record<string, unknown>> implements AfterViewChecked, OnDestroy {
+export class DataTableVirtualScrollComponent<T extends Record<string, unknown>> {
   private readonly injectedRows = inject<Signal<T[]> | null>(TABLE_DATA, {
     optional: true
   });
@@ -183,19 +182,6 @@ export class DataTableVirtualScrollComponent<T extends Record<string, unknown>> 
     optional: true
   });
   private readonly templatesRegistry = inject(TABLE_TEMPLATES);
-  private readonly changeDetectorRef = inject(ChangeDetectorRef);
-  private readonly ngZone = inject(NgZone);
-  private intersectionObserver?: IntersectionObserver;
-  private resizeObserver?: ResizeObserver;
-  private scrollRootElement?: HTMLElement;
-  private topSentinelElement?: HTMLElement;
-  private bottomSentinelElement?: HTMLElement;
-  private observedRowElements = new Set<HTMLElement>();
-  private measurementTimer?: ReturnType<typeof setTimeout>;
-  private scrollIdleTimer?: ReturnType<typeof setTimeout>;
-  private isPointerActive = false;
-  private isScrolling = false;
-  private pendingMeasurements: VirtualRowMeasurement[] = [];
 
   readonly data = input<T[] | null>(null);
   readonly columns = input<ColumnDef<T>[] | null>(null);
@@ -209,99 +195,12 @@ export class DataTableVirtualScrollComponent<T extends Record<string, unknown>> 
   readonly childRowTemplateKey = input<string | null>(null);
   readonly childRowWhen = input<DataTableChildRowPredicate<T> | null>(null);
 
-  private readonly scrollTop = signal(0);
-  private readonly viewportHeight = signal(0);
-  private readonly measuredHeights = signal<Record<string, number>>({});
-  private readonly renderedRowsHeight = signal(0);
-
-  private readonly virtualRows = computed(() =>
+  readonly virtualRows = computed(() =>
     this.rows().map((row, index) => ({
       hasChildRow: this.hasChildRow(row, index),
       key: this.rowKey(row, index)
     }))
   );
-
-  private readonly rowsLayout = computed<VirtualRowsLayout>(() => {
-    return calculateVirtualRowsLayout({
-      childRowHeight: this.childRowHeight(),
-      measuredHeights: this.measuredHeights(),
-      rowHeight: this.rowHeight(),
-      rows: this.virtualRows()
-    });
-  });
-
-  private readonly virtualRange = computed(() => {
-    return calculateVirtualRange({
-      initialRows: this.initialRows(),
-      layout: this.rowsLayout(),
-      overscanRows: this.overscanRows(),
-      rowHeight: this.rowHeight(),
-      scrollTop: this.scrollTop(),
-      viewportHeight: this.viewportHeight()
-    });
-  });
-
-  readonly visibleRows = computed(() => {
-    const range = this.virtualRange();
-
-    return this.rows().slice(range.start, range.end);
-  });
-
-  readonly topSpacerHeight = computed(() => {
-    return calculateVirtualTopOffset({
-      layout: this.rowsLayout(),
-      range: this.virtualRange(),
-      renderedRowsHeight: this.renderedRowsHeight(),
-      scrollTop: this.scrollTop(),
-      viewportHeight: this.viewportHeight()
-    });
-  });
-
-  readonly totalHeight = computed(() => this.rowsLayout().totalHeight);
-
-  constructor() {
-    effect(() => {
-      this.rootMargin();
-      this.connectObserver();
-    });
-  }
-
-  ngAfterViewChecked(): void {
-    this.scheduleRenderedRowsMeasurement();
-  }
-
-  @ViewChild('scrollRoot')
-  set scrollRoot(scrollRoot: ElementRef<HTMLElement> | undefined) {
-    this.scrollRootElement = scrollRoot?.nativeElement;
-    this.connectObserver();
-  }
-
-  @ViewChild('topVirtualSentinel')
-  set topVirtualSentinel(topVirtualSentinel: ElementRef<HTMLElement> | undefined) {
-    this.topSentinelElement = topVirtualSentinel?.nativeElement;
-    this.connectObserver();
-  }
-
-  @ViewChild('bottomVirtualSentinel')
-  set bottomVirtualSentinel(bottomVirtualSentinel: ElementRef<HTMLElement> | undefined) {
-    this.bottomSentinelElement = bottomVirtualSentinel?.nativeElement;
-    this.connectObserver();
-  }
-
-  ngOnDestroy(): void {
-    if (this.measurementTimer !== undefined) {
-      clearTimeout(this.measurementTimer);
-      this.measurementTimer = undefined;
-    }
-
-    if (this.scrollIdleTimer !== undefined) {
-      clearTimeout(this.scrollIdleTimer);
-      this.scrollIdleTimer = undefined;
-    }
-
-    this.disconnectObserver();
-    this.disconnectResizeObserver();
-  }
 
   rows(): T[] {
     return this.data() ?? this.injectedRows?.() ?? (EMPTY_ROWS as T[]);
@@ -336,12 +235,16 @@ export class DataTableVirtualScrollComponent<T extends Record<string, unknown>> 
     return 100 / this.colspan();
   }
 
-  bodyTransform(): string {
-    return `translateY(${this.topSpacerHeight()}px)`;
+  bodyTransform(topOffset: number): string {
+    return `translateY(${topOffset}px)`;
   }
 
-  virtualRowIndex(visibleRowIndex: number): number {
-    return this.virtualRange().start + visibleRowIndex;
+  visibleRows(range: VirtualRowsRange): T[] {
+    return this.rows().slice(range.start, range.end);
+  }
+
+  virtualRowIndex(visibleRowIndex: number, range: VirtualRowsRange): number {
+    return range.start + visibleRowIndex;
   }
 
   rowMeasurementKey(row: T, index: number, part: VirtualRowPart): string {
@@ -364,281 +267,16 @@ export class DataTableVirtualScrollComponent<T extends Record<string, unknown>> 
     return this.templatesRegistry.get(templateKey);
   }
 
-  onScroll(): void {
-    this.deferMeasurementsUntilScrollIdle();
-    this.syncViewport();
-  }
-
-  @HostListener('document:mousedown')
-  @HostListener('document:pointerdown')
-  onScrollPointerDown(): void {
-    this.isPointerActive = true;
-  }
-
-  @HostListener('document:pointercancel')
-  @HostListener('document:pointerup')
-  @HostListener('document:mouseup')
-  onDocumentPointerRelease(): void {
-    if (!this.isPointerActive) {
-      return;
-    }
-
-    this.isPointerActive = false;
-
-    if (!this.isScrolling) {
-      this.flushPendingMeasurements();
-    }
-  }
-
   rowKey(row: T, index: number): string {
     const id = row['id'];
 
     return id === undefined || id === null ? `${index}` : String(id);
   }
 
-  private connectObserver(): void {
-    this.disconnectObserver();
+  trackRow(row: T): unknown {
+    const id = row['id'];
 
-    if (!this.scrollRootElement || (!this.topSentinelElement && !this.bottomSentinelElement)) {
-      return;
-    }
-
-    const Observer = globalThis.IntersectionObserver;
-
-    if (!Observer) {
-      return;
-    }
-
-    this.ngZone.runOutsideAngular(() => {
-      this.intersectionObserver = new Observer(
-        entries => {
-          if (!entries.some(entry => entry.isIntersecting)) {
-            return;
-          }
-
-          this.ngZone.run(() => {
-            this.syncViewport();
-            this.changeDetectorRef.markForCheck();
-          });
-        },
-        {
-          root: this.scrollRootElement,
-          rootMargin: this.rootMargin(),
-          threshold: 0
-        }
-      );
-
-      if (this.topSentinelElement) {
-        this.intersectionObserver.observe(this.topSentinelElement);
-      }
-
-      if (this.bottomSentinelElement) {
-        this.intersectionObserver.observe(this.bottomSentinelElement);
-      }
-    });
-  }
-
-  private disconnectObserver(): void {
-    this.intersectionObserver?.disconnect();
-    this.intersectionObserver = undefined;
-  }
-
-  private disconnectResizeObserver(): void {
-    this.resizeObserver?.disconnect();
-    this.resizeObserver = undefined;
-    this.observedRowElements.clear();
-  }
-
-  private deferMeasurementsUntilScrollIdle(): void {
-    this.isScrolling = true;
-
-    if (this.scrollIdleTimer !== undefined) {
-      clearTimeout(this.scrollIdleTimer);
-    }
-
-    this.scrollIdleTimer = setTimeout(() => {
-      this.scrollIdleTimer = undefined;
-      this.isScrolling = false;
-
-      if (this.isPointerActive) {
-        return;
-      }
-
-      this.flushPendingMeasurements();
-    }, SCROLL_IDLE_MEASUREMENT_DELAY_MS);
-  }
-
-  private syncViewport(): void {
-    const scrollRoot = this.scrollRootElement;
-
-    if (!scrollRoot) {
-      return;
-    }
-
-    this.scrollTop.set(scrollRoot.scrollTop);
-    this.viewportHeight.set(scrollRoot.clientHeight);
-  }
-
-  private scheduleRenderedRowsMeasurement(): void {
-    if (this.measurementTimer !== undefined) {
-      return;
-    }
-
-    this.measurementTimer = setTimeout(() => {
-      this.measurementTimer = undefined;
-      this.measureRenderedRows();
-    }, 0);
-  }
-
-  private measureRenderedRows(): void {
-    const scrollRoot = this.scrollRootElement;
-
-    if (!scrollRoot) {
-      return;
-    }
-
-    const rowElements = Array.from(scrollRoot.querySelectorAll<HTMLElement>('[data-virtual-row-key]'));
-    const measurements = rowElements.map(rowElement => ({
-      height: this.heightForElement(rowElement),
-      key: rowElement.dataset['virtualRowKey']
-    }));
-
-    this.updateRenderedRowsHeight(measurements);
-    this.observeRenderedRows(rowElements);
-    this.applyMeasuredHeights(measurements);
-  }
-
-  private observeRenderedRows(rowElements: HTMLElement[]): void {
-    const Observer = globalThis.ResizeObserver;
-
-    if (!Observer) {
-      return;
-    }
-
-    if (!this.resizeObserver) {
-      this.ngZone.runOutsideAngular(() => {
-        this.resizeObserver = new Observer(entries => {
-          const measurements = entries.map(entry => {
-            const element = entry.target as HTMLElement;
-
-            return {
-              height: this.heightForElement(element, entry),
-              key: element.dataset['virtualRowKey']
-            };
-          });
-
-          this.ngZone.run(() => {
-            this.applyMeasuredHeights(measurements);
-          });
-        });
-      });
-    }
-
-    const nextObservedElements = new Set(rowElements);
-
-    for (const observedElement of this.observedRowElements) {
-      if (!nextObservedElements.has(observedElement)) {
-        this.resizeObserver?.unobserve(observedElement);
-      }
-    }
-
-    for (const rowElement of nextObservedElements) {
-      if (!this.observedRowElements.has(rowElement)) {
-        this.resizeObserver?.observe(rowElement);
-      }
-    }
-
-    this.observedRowElements = nextObservedElements;
-  }
-
-  private applyMeasuredHeights(measurements: VirtualRowMeasurement[]): void {
-    if (this.isScrolling || this.isPointerActive) {
-      this.pendingMeasurements.push(...measurements);
-      return;
-    }
-
-    this.commitMeasuredHeights(measurements);
-  }
-
-  private updateRenderedRowsHeight(measurements: VirtualRowMeasurement[]): void {
-    const height = calculateRenderedRowsHeight(measurements);
-
-    if (!height || Math.abs(this.renderedRowsHeight() - height) < 0.5) {
-      return;
-    }
-
-    this.renderedRowsHeight.set(height);
-  }
-
-  private flushPendingMeasurements(): void {
-    if (!this.pendingMeasurements.length) {
-      return;
-    }
-
-    const measurements = this.pendingMeasurements;
-    this.pendingMeasurements = [];
-    this.commitMeasuredHeights(measurements);
-  }
-
-  private commitMeasuredHeights(measurements: VirtualRowMeasurement[]): void {
-    const scrollRoot = this.scrollRootElement;
-    const previousTotalHeight = this.totalHeight();
-    const previousScrollTop = scrollRoot?.scrollTop ?? 0;
-    let changed = false;
-
-    this.measuredHeights.update(currentHeights => {
-      let nextHeights = currentHeights;
-
-      for (const measurement of measurements) {
-        if (!measurement.key || measurement.height === null) {
-          continue;
-        }
-
-        const currentHeight = currentHeights[measurement.key];
-
-        if (currentHeight !== undefined && Math.abs(currentHeight - measurement.height) < 0.5) {
-          continue;
-        }
-
-        if (nextHeights === currentHeights) {
-          nextHeights = { ...currentHeights };
-        }
-
-        nextHeights[measurement.key] = measurement.height;
-        changed = true;
-      }
-
-      return nextHeights;
-    });
-
-    if (!changed) {
-      return;
-    }
-
-    if (scrollRoot) {
-      scrollRoot.scrollTop = calculatePreservedScrollTop({
-        nextTotalHeight: this.totalHeight(),
-        previousScrollTop,
-        previousTotalHeight,
-        viewportHeight: scrollRoot.clientHeight
-      });
-    }
-
-    this.syncViewport();
-    this.changeDetectorRef.markForCheck();
-  }
-
-  private heightForElement(element: HTMLElement, entry?: ResizeObserverEntry): number | null {
-    const borderBoxSize = entry?.borderBoxSize;
-    const firstBorderBoxSize = Array.isArray(borderBoxSize) ? borderBoxSize[0] : borderBoxSize;
-    const height = Math.max(
-      firstBorderBoxSize?.blockSize ?? 0,
-      entry?.contentRect.height ?? 0,
-      element.getBoundingClientRect().height,
-      element.offsetHeight
-    );
-
-    return Number.isFinite(height) && height > 0 ? height : null;
+    return id === undefined || id === null ? row : String(id);
   }
 
   private hasChildRow(row: T, rowIndex: number): boolean {
