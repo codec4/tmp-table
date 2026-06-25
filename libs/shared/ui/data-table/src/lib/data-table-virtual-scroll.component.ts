@@ -174,13 +174,9 @@ import { EMPTY_ROWS, resolveColumnSource } from './data-table.utils';
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class DataTableVirtualScrollComponent<T extends Record<string, unknown>> {
-  readonly #injectedRows = inject<Signal<T[]> | null>(TABLE_DATA, {
-    optional: true
-  });
+  readonly #injectedRows = inject<Signal<T[]> | null>(TABLE_DATA, { optional: true });
   readonly #injectedColumns = inject<TableColumnSource<T>>(COLUMNS);
-  readonly #injectedLoading = inject<Signal<boolean> | null>(TABLE_LOADING, {
-    optional: true
-  });
+  readonly #injectedLoading = inject<Signal<boolean> | null>(TABLE_LOADING, { optional: true });
   readonly #templatesRegistry = inject(TABLE_TEMPLATES);
 
   readonly data = input<T[] | null>(null);
