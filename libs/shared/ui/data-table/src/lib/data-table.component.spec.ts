@@ -150,6 +150,10 @@ describe('data table components', () => {
       expect(fixture.nativeElement.textContent).toContain('Row 20');
       expect(virtualScrollSpaceFor(fixture).style.height).toBe('400px');
       expect(virtualBodyFor(fixture).style.transform).toBe('translateY(300px)');
+      expect(fixture.componentInstance.ranges).toContainEqual({
+        end: 20,
+        start: 15
+      });
     } finally {
       restoreIntersectionObserver();
     }
@@ -352,12 +356,14 @@ class DataTableTemplateHostComponent {}
       [overscanRows]="1"
       [rowHeight]="20"
       height="10rem"
+      (rangeChange)="ranges.push($event)"
     />
   `
 })
 class VirtualScrollHostComponent {
   readonly columns: ColumnDef<TestRow>[] = [{ key: 'name', header: 'Name' }];
   readonly rows: TestRow[] = createRows(20);
+  readonly ranges: Array<{ end: number; start: number }> = [];
 }
 
 @Component({

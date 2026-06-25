@@ -1,5 +1,14 @@
 import { NgTemplateOutlet } from '@angular/common';
-import { ChangeDetectionStrategy, Component, Signal, TemplateRef, computed, inject, input } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  Signal,
+  TemplateRef,
+  computed,
+  inject,
+  input,
+  output
+} from '@angular/core';
 import { DataTableVirtualScrollControllerDirective } from './data-table-virtual-scroll-controller.directive';
 import { DataTableVirtualScrollMeasureDirective } from './data-table-virtual-scroll-measure.directive';
 import {
@@ -43,6 +52,7 @@ import { EMPTY_ROWS, resolveColumnSource } from './data-table.utils';
       [dataTableVirtualScrollRowHeight]="rowHeight()"
       [dataTableVirtualScrollChildRowHeight]="childRowHeight()"
       [dataTableVirtualScrollRootMargin]="rootMargin()"
+      (dataTableVirtualScrollRangeChange)="rangeChange.emit($event)"
     >
       <table class="sticky top-0 z-20 w-full min-w-full table-fixed border-separate border-spacing-0 text-sm">
         <colgroup>
@@ -190,6 +200,7 @@ export class DataTableVirtualScrollComponent<T extends Record<string, unknown>> 
   readonly rootMargin = input('240px 0px');
   readonly childRowTemplateKey = input<string | null>(null);
   readonly childRowWhen = input<DataTableChildRowPredicate<T> | null>(null);
+  readonly rangeChange = output<VirtualRowsRange>();
 
   readonly virtualRows = computed(() =>
     this.rows().map((row, index) => ({

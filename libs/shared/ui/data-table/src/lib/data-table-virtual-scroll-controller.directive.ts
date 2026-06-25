@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Directive, computed, inject, input, signal } from '@angular/core';
+import { ChangeDetectorRef, Directive, computed, effect, inject, input, output, signal } from '@angular/core';
 import {
   DEFAULT_VIRTUAL_SCROLL_CHILD_ROW_HEIGHT,
   DEFAULT_VIRTUAL_SCROLL_INITIAL_ROWS,
@@ -30,6 +30,7 @@ export class DataTableVirtualScrollControllerDirective {
   readonly #isPointerActive = signal(false);
   readonly #isScrolling = signal(false);
   #pendingMeasurements: VirtualRowMeasurement[] = [];
+  #emittedRange: VirtualRowsRange | null = null;
 
   readonly rows = input<VirtualScrollRow[]>([], {
     alias: 'dataTableVirtualScrollRows'
@@ -48,6 +49,9 @@ export class DataTableVirtualScrollControllerDirective {
   });
   readonly rootMargin = input('240px 0px', {
     alias: 'dataTableVirtualScrollRootMargin'
+  });
+  readonly rangeChange = output<VirtualRowsRange>({
+    alias: 'dataTableVirtualScrollRangeChange'
   });
 
   readonly scrollRootElement = signal<HTMLElement | null>(null);
@@ -83,6 +87,19 @@ export class DataTableVirtualScrollControllerDirective {
   );
 
   readonly totalHeight = computed(() => this.layout().totalHeight);
+
+  constructor() {
+    effect(() => {
+      const range = this.range();
+
+      if (this.#emittedRange?.start === range.start && this.#emittedRange.end === range.end) {
+        return;
+      }
+
+      this.#emittedRange = range;
+      this.rangeChange.emit(range);
+    });
+  }
 
   setScrollRoot(scrollRoot: HTMLElement | null): void {
     this.scrollRootElement.set(scrollRoot);

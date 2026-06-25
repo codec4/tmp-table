@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import {
   ColumnDef,
   DataTableComponent,
@@ -6,6 +6,7 @@ import {
   DataTableVirtualScrollComponent,
   provideTableTemplates
 } from '@table-provider/data-table';
+import { MockUsersService, PagedResponse, UserRow } from './mock-users.service';
 
 type ProductStatus = 'active' | 'review' | 'paused';
 
@@ -60,6 +61,23 @@ const columns: ColumnDef<ProductRow>[] = [
 ];
 
 const productRows = createProducts(1250);
+
+type PagedUserRow = UserRow & {
+  isPlaceholder?: boolean;
+};
+
+type PaginationState = PagedResponse<UserRow>['pagination'];
+
+const userColumns: ColumnDef<PagedUserRow>[] = [
+  { key: 'id', header: 'ID' },
+  { key: 'name', header: 'Name' },
+  { key: 'email', header: 'Email' },
+  { key: 'role', header: 'Role' },
+  { key: 'region', header: 'Region' },
+  { key: 'status', header: 'Status', templateKey: 'pagedStatusBadge' },
+  { key: 'lastSeen', header: 'Last Seen' },
+  { key: 'usage', header: 'Usage' }
+];
 
 @Component({
   imports: [DataTableComponent, DataTableTemplateDirective],
@@ -135,6 +153,149 @@ class PaginationTableShowcaseComponent {
 
   nextPage(): void {
     this.pageIndex.update(page => Math.min(page + 1, this.pageCount() - 1));
+  }
+}
+
+@Component({
+  imports: [DataTableVirtualScrollComponent, DataTableTemplateDirective],
+  providers: [provideTableTemplates(), MockUsersService],
+  selector: 'app-contract-virtual-scroll-table-showcase',
+  template: `
+    <section class="mb-14 space-y-4 border-b border-slate-300 pb-14">
+      <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div>
+          <h2 class="text-lg font-semibold text-slate-950">Paged API + Virtual Scroll</h2>
+          <p class="text-sm text-slate-500">
+            Loaded {{ loadedCount() }} of {{ pagination().totalItems }} users from {{ loadedPageCount() }} cached pages
+            @if (loadingPageCount()) {
+              <span class="text-slate-400">
+                - fetching {{ loadingPageCount() }} page{{ loadingPageCount() === 1 ? '' : 's' }}
+              </span>
+            }
+          </p>
+        </div>
+        <code class="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs text-slate-600 shadow-sm">
+          GET /users?page={{ pagination().page }}&pageSize={{ pageSize }}&status=All&search=
+        </code>
+      </div>
+
+      <ng-template tableTemplate="pagedStatusBadge" let-row let-value="value">
+        <span
+          class="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset"
+          [class.bg-emerald-50]="!row.isPlaceholder && value === 'Active'"
+          [class.text-emerald-700]="!row.isPlaceholder && value === 'Active'"
+          [class.ring-emerald-600/20]="!row.isPlaceholder && value === 'Active'"
+          [class.bg-sky-50]="!row.isPlaceholder && value === 'Invited'"
+          [class.text-sky-700]="!row.isPlaceholder && value === 'Invited'"
+          [class.ring-sky-600/20]="!row.isPlaceholder && value === 'Invited'"
+          [class.bg-slate-100]="row.isPlaceholder || value === 'Suspended'"
+          [class.text-slate-700]="row.isPlaceholder || value === 'Suspended'"
+          [class.ring-slate-600/20]="row.isPlaceholder || value === 'Suspended'"
+        >
+          {{ row.isPlaceholder ? 'Loading' : value }}
+        </span>
+      </ng-template>
+
+      <lib-data-table-virtual-scroll
+        [columns]="columns"
+        [data]="rows()"
+        [loading]="isInitialLoading()"
+        [initialRows]="24"
+        [overscanRows]="24"
+        height="26rem"
+        (rangeChange)="loadVisibleRange($event)"
+      />
+    </section>
+  `,
+  changeDetection: ChangeDetectionStrategy.OnPush
+})
+class ContractVirtualScrollTableShowcaseComponent {
+  readonly #usersService = inject(MockUsersService);
+  readonly #requestedPages = new Set<number>();
+
+  readonly columns = userColumns;
+  readonly pageSize = 50;
+  readonly pagination = signal<PaginationState>({
+    page: 1,
+    pageSize: this.pageSize,
+    totalItems: 0,
+    totalPages: 0
+  });
+  readonly pages = signal<Record<number, UserRow[]>>({});
+  readonly pendingPages = signal<ReadonlySet<number>>(new Set());
+  readonly rows = computed<PagedUserRow[]>(() => {
+    const pages = this.pages();
+
+    return Array.from({ length: this.pagination().totalItems }, (_, index) => {
+      const page = this.#pageForIndex(index);
+
+      return pages[page]?.[index % this.pageSize] ?? placeholderUser(index);
+    });
+  });
+  readonly loadedCount = computed(() => Object.values(this.pages()).reduce((total, page) => total + page.length, 0));
+  readonly loadedPageCount = computed(() => Object.keys(this.pages()).length);
+  readonly loadingPageCount = computed(() => this.pendingPages().size);
+  readonly isInitialLoading = computed(() => this.loadedCount() === 0 && this.loadingPageCount() > 0);
+
+  constructor() {
+    this.#loadPage(1);
+  }
+
+  loadVisibleRange(range: { start: number; end: number }): void {
+    const totalItems = this.pagination().totalItems;
+    const start = Math.max(range.start - this.pageSize, 0);
+    const end = totalItems ? Math.min(range.end + this.pageSize, totalItems) : range.end;
+
+    this.#loadRange(start, end);
+  }
+
+  #loadRange(start: number, end: number): void {
+    if (end <= start) {
+      return;
+    }
+
+    const firstPage = this.#pageForIndex(start);
+    const lastPage = this.#pageForIndex(end - 1);
+
+    for (let page = firstPage; page <= lastPage; page += 1) {
+      this.#loadPage(page);
+    }
+  }
+
+  #loadPage(page: number): void {
+    if (this.#requestedPages.has(page)) {
+      return;
+    }
+
+    this.#requestedPages.add(page);
+    this.pendingPages.update(pendingPages => new Set(pendingPages).add(page));
+
+    void this.#usersService
+      .getUsers({
+        page,
+        pageSize: this.pageSize,
+        search: '',
+        status: 'All'
+      })
+      .then(response => {
+        this.pagination.set(response.pagination);
+        this.pages.update(pages => ({
+          ...pages,
+          [page]: response.items
+        }));
+      })
+      .finally(() => {
+        this.pendingPages.update(pendingPages => {
+          const nextPendingPages = new Set(pendingPages);
+          nextPendingPages.delete(page);
+
+          return nextPendingPages;
+        });
+      });
+  }
+
+  #pageForIndex(index: number): number {
+    return Math.floor(index / this.pageSize) + 1;
   }
 }
 
@@ -242,6 +403,7 @@ class ChildRowVirtualScrollTableShowcaseComponent {
 @Component({
   imports: [
     PaginationTableShowcaseComponent,
+    ContractVirtualScrollTableShowcaseComponent,
     VirtualScrollTableShowcaseComponent,
     ChildRowVirtualScrollTableShowcaseComponent
   ],
@@ -255,6 +417,7 @@ class ChildRowVirtualScrollTableShowcaseComponent {
         </header>
 
         <app-pagination-table-showcase />
+        <app-contract-virtual-scroll-table-showcase />
         <app-virtual-scroll-table-showcase />
         <app-child-row-virtual-scroll-table-showcase />
       </section>
@@ -290,4 +453,20 @@ function createProducts(count: number): ProductRow[] {
       nextAudit: `2026-Q${(index % 4) + 1}`
     };
   });
+}
+
+function placeholderUser(index: number): PagedUserRow {
+  const id = index + 1;
+
+  return {
+    id,
+    name: `Loading user ${String(id).padStart(4, '0')}`,
+    email: 'Waiting for page',
+    role: 'Pending',
+    status: 'Invited',
+    region: 'Pending',
+    lastSeen: 'Pending',
+    usage: '-',
+    isPlaceholder: true
+  };
 }

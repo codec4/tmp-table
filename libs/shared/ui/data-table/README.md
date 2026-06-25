@@ -32,4 +32,8 @@ its parent, so virtual scrolling keeps each parent and child row together. Use `
 have child row content. `rowHeight` and `childRowHeight` are initial estimates for rows that have not been rendered yet;
 the component measures visible parent and child rows and uses those measurements for subsequent scroll math.
 
+Use `(rangeChange)` to connect virtual scrolling to a server-paged data source. The event reports the zero-based parent
+row range currently requested by the virtual window, which can be translated to `page` and `pageSize` requests while the
+table renders cached rows and placeholders for unloaded indexes.
+
 Run `nx test data-table` to execute the unit tests.
