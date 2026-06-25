@@ -179,6 +179,122 @@ describe('data table components', () => {
     }
   });
 
+  it('defers measured height changes while scrolling so the scrollbar thumb mapping stays stable', async () => {
+    const restoreIntersectionObserver = installMockIntersectionObserver();
+    const getBoundingClientRect = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect');
+
+    getBoundingClientRect.mockImplementation(function (this: HTMLElement) {
+      return this.dataset['virtualRowKey']?.startsWith('parent:') ? rectWithHeight(30) : rectWithHeight(0);
+    });
+
+    try {
+      await TestBed.configureTestingModule({
+        imports: [VirtualScrollHostComponent]
+      }).compileComponents();
+
+      const fixture = TestBed.createComponent(VirtualScrollHostComponent);
+      await render(fixture);
+
+      const scrollRoot = scrollRootFor(fixture);
+      setClientHeight(scrollRoot, 40);
+      scrollRoot.scrollTop = 160;
+      scrollRoot.dispatchEvent(new Event('scroll'));
+      fixture.detectChanges();
+
+      await new Promise(resolve => setTimeout(resolve, 0));
+      fixture.detectChanges();
+
+      expect(virtualScrollSpaceFor(fixture).style.height).toBe('400px');
+
+      await new Promise(resolve => setTimeout(resolve, 260));
+      fixture.detectChanges();
+
+      expect(virtualScrollSpaceFor(fixture).style.height).toBe('450px');
+      expect(scrollRoot.scrollTop).toBeCloseTo(182.22, 1);
+    } finally {
+      getBoundingClientRect.mockRestore();
+      restoreIntersectionObserver();
+    }
+  });
+
+  it('keeps measured height changes deferred while the scroll thumb pointer is held', async () => {
+    const restoreIntersectionObserver = installMockIntersectionObserver();
+    const getBoundingClientRect = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect');
+
+    getBoundingClientRect.mockImplementation(function (this: HTMLElement) {
+      return this.dataset['virtualRowKey']?.startsWith('parent:') ? rectWithHeight(30) : rectWithHeight(0);
+    });
+
+    try {
+      await TestBed.configureTestingModule({
+        imports: [VirtualScrollHostComponent]
+      }).compileComponents();
+
+      const fixture = TestBed.createComponent(VirtualScrollHostComponent);
+      await render(fixture);
+
+      const scrollRoot = scrollRootFor(fixture);
+      setClientHeight(scrollRoot, 40);
+      scrollRoot.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+      scrollRoot.scrollTop = 160;
+      scrollRoot.dispatchEvent(new Event('scroll'));
+      fixture.detectChanges();
+
+      await new Promise(resolve => setTimeout(resolve, 260));
+      fixture.detectChanges();
+
+      expect(virtualScrollSpaceFor(fixture).style.height).toBe('400px');
+
+      document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+      fixture.detectChanges();
+
+      expect(virtualScrollSpaceFor(fixture).style.height).toBe('450px');
+    } finally {
+      getBoundingClientRect.mockRestore();
+      restoreIntersectionObserver();
+    }
+  });
+
+  it('bottom-aligns the final measured child-row window without changing scroll height while dragging', async () => {
+    const restoreIntersectionObserver = installMockIntersectionObserver();
+    const getBoundingClientRect = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect');
+
+    getBoundingClientRect.mockImplementation(function (this: HTMLElement) {
+      if (this.dataset['virtualRowKey']?.startsWith('parent:')) {
+        return rectWithHeight(20);
+      }
+
+      return this.dataset['virtualRowKey']?.startsWith('child:') ? rectWithHeight(1) : rectWithHeight(0);
+    });
+
+    try {
+      await TestBed.configureTestingModule({
+        imports: [VirtualScrollChildRowHostComponent]
+      }).compileComponents();
+
+      const fixture = TestBed.createComponent(VirtualScrollChildRowHostComponent);
+      await render(fixture);
+
+      const scrollRoot = scrollRootFor(fixture);
+      setClientHeight(scrollRoot, 40);
+      scrollRoot.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+      scrollRoot.scrollTop = 460;
+      scrollRoot.dispatchEvent(new Event('scroll'));
+      fixture.detectChanges();
+      await new Promise(resolve => setTimeout(resolve, 0));
+      fixture.detectChanges();
+
+      const virtualBodyOffset = transformOffsetFor(virtualBodyFor(fixture));
+      const renderedRowsHeight = renderedVirtualRowHeightFor(fixture);
+
+      expect(virtualScrollSpaceFor(fixture).style.height).toBe('500px');
+      expect(virtualBodyOffset + renderedRowsHeight).toBeGreaterThanOrEqual(500);
+    } finally {
+      getBoundingClientRect.mockRestore();
+      restoreIntersectionObserver();
+    }
+  });
+
   it('keeps optional child rows with their parent rows while virtual scrolling', async () => {
     const restoreIntersectionObserver = installMockIntersectionObserver();
 
@@ -394,6 +510,18 @@ const setClientHeight = (element: HTMLElement, clientHeight: number): void => {
     configurable: true,
     value: clientHeight
   });
+};
+
+const renderedVirtualRowHeightFor = (fixture: ComponentFixture<unknown>): number =>
+  Array.from(virtualScrollSpaceFor(fixture).querySelectorAll<HTMLElement>('[data-virtual-row-key]')).reduce(
+    (totalHeight, rowElement) => totalHeight + rowElement.getBoundingClientRect().height,
+    0
+  );
+
+const transformOffsetFor = (element: HTMLElement): number => {
+  const match = /translateY\(([-\d.]+)px\)/.exec(element.style.transform);
+
+  return match ? Number(match[1]) : 0;
 };
 
 const rectWithHeight = (height: number): DOMRect => {

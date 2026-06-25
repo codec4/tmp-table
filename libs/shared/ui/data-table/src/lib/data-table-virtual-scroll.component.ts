@@ -5,6 +5,7 @@ import {
   ChangeDetectorRef,
   Component,
   ElementRef,
+  HostListener,
   NgZone,
   OnDestroy,
   Signal,
@@ -45,6 +46,7 @@ const DEFAULT_INITIAL_ROWS = 25;
 const DEFAULT_OVERSCAN_ROWS = 25;
 const DEFAULT_ROW_HEIGHT = 48;
 const DEFAULT_CHILD_ROW_HEIGHT = 57;
+const SCROLL_IDLE_MEASUREMENT_DELAY_MS = 240;
 
 @Component({
   selector: 'lib-data-table-virtual-scroll',
@@ -92,6 +94,8 @@ const DEFAULT_CHILD_ROW_HEIGHT = 57;
           data-testid="table-scroll-root"
           [style.max-height]="height()"
           style="overflow-anchor: none"
+          (mousedown)="onScrollPointerDown()"
+          (pointerdown)="onScrollPointerDown()"
           (scroll)="onScroll()"
         >
           <div
@@ -194,6 +198,10 @@ export class DataTableVirtualScrollComponent<T extends Record<string, unknown>> 
   private bottomSentinelElement?: HTMLElement;
   private observedRowElements = new Set<HTMLElement>();
   private measurementTimer?: ReturnType<typeof setTimeout>;
+  private scrollIdleTimer?: ReturnType<typeof setTimeout>;
+  private isPointerActive = false;
+  private isScrolling = false;
+  private pendingMeasurements: Array<{ height: number | null; key: string | undefined }> = [];
 
   readonly data = input<T[] | null>(null);
   readonly columns = input<ColumnDef<T>[] | null>(null);
@@ -210,6 +218,7 @@ export class DataTableVirtualScrollComponent<T extends Record<string, unknown>> 
   private readonly scrollTop = signal(0);
   private readonly viewportHeight = signal(0);
   private readonly measuredHeights = signal<Record<string, number>>({});
+  private readonly renderedRowsHeight = signal(0);
 
   private readonly rowsLayout = computed<VirtualRowsLayout>(() => {
     const rows = this.rows();
@@ -267,7 +276,25 @@ export class DataTableVirtualScrollComponent<T extends Record<string, unknown>> 
     return this.rows().slice(range.start, range.end);
   });
 
-  readonly topSpacerHeight = computed(() => this.rowsLayout().offsets[this.virtualRange().start] ?? 0);
+  readonly topSpacerHeight = computed(() => {
+    const layout = this.rowsLayout();
+    const range = this.virtualRange();
+    const startOffset = layout.offsets[range.start] ?? 0;
+    const renderedRowsHeight = this.renderedRowsHeight();
+
+    if (!renderedRowsHeight || range.end !== layout.rowCount) {
+      return startOffset;
+    }
+
+    const viewportBottom = this.scrollTop() + this.viewportHeight();
+    const renderedRowsBottom = startOffset + renderedRowsHeight;
+
+    if (viewportBottom <= renderedRowsBottom) {
+      return startOffset;
+    }
+
+    return Math.max(startOffset, viewportBottom - renderedRowsHeight);
+  });
 
   readonly totalHeight = computed(() => this.rowsLayout().totalHeight);
 
@@ -304,6 +331,11 @@ export class DataTableVirtualScrollComponent<T extends Record<string, unknown>> 
     if (this.measurementTimer !== undefined) {
       clearTimeout(this.measurementTimer);
       this.measurementTimer = undefined;
+    }
+
+    if (this.scrollIdleTimer !== undefined) {
+      clearTimeout(this.scrollIdleTimer);
+      this.scrollIdleTimer = undefined;
     }
 
     this.disconnectObserver();
@@ -372,7 +404,29 @@ export class DataTableVirtualScrollComponent<T extends Record<string, unknown>> 
   }
 
   onScroll(): void {
+    this.deferMeasurementsUntilScrollIdle();
     this.syncViewport();
+  }
+
+  @HostListener('document:mousedown')
+  @HostListener('document:pointerdown')
+  onScrollPointerDown(): void {
+    this.isPointerActive = true;
+  }
+
+  @HostListener('document:pointercancel')
+  @HostListener('document:pointerup')
+  @HostListener('document:mouseup')
+  onDocumentPointerRelease(): void {
+    if (!this.isPointerActive) {
+      return;
+    }
+
+    this.isPointerActive = false;
+
+    if (!this.isScrolling) {
+      this.flushPendingMeasurements();
+    }
   }
 
   rowKey(row: T, index: number): string {
@@ -434,6 +488,25 @@ export class DataTableVirtualScrollComponent<T extends Record<string, unknown>> 
     this.observedRowElements.clear();
   }
 
+  private deferMeasurementsUntilScrollIdle(): void {
+    this.isScrolling = true;
+
+    if (this.scrollIdleTimer !== undefined) {
+      clearTimeout(this.scrollIdleTimer);
+    }
+
+    this.scrollIdleTimer = setTimeout(() => {
+      this.scrollIdleTimer = undefined;
+      this.isScrolling = false;
+
+      if (this.isPointerActive) {
+        return;
+      }
+
+      this.flushPendingMeasurements();
+    }, SCROLL_IDLE_MEASUREMENT_DELAY_MS);
+  }
+
   private syncViewport(): void {
     const scrollRoot = this.scrollRootElement;
 
@@ -464,14 +537,14 @@ export class DataTableVirtualScrollComponent<T extends Record<string, unknown>> 
     }
 
     const rowElements = Array.from(scrollRoot.querySelectorAll<HTMLElement>('[data-virtual-row-key]'));
+    const measurements = rowElements.map(rowElement => ({
+      height: this.heightForElement(rowElement),
+      key: rowElement.dataset['virtualRowKey']
+    }));
 
+    this.updateRenderedRowsHeight(measurements);
     this.observeRenderedRows(rowElements);
-    this.applyMeasuredHeights(
-      rowElements.map(rowElement => ({
-        height: this.heightForElement(rowElement),
-        key: rowElement.dataset['virtualRowKey']
-      }))
-    );
+    this.applyMeasuredHeights(measurements);
   }
 
   private observeRenderedRows(rowElements: HTMLElement[]): void {
@@ -518,6 +591,38 @@ export class DataTableVirtualScrollComponent<T extends Record<string, unknown>> 
   }
 
   private applyMeasuredHeights(measurements: Array<{ height: number | null; key: string | undefined }>): void {
+    if (this.isScrolling || this.isPointerActive) {
+      this.pendingMeasurements.push(...measurements);
+      return;
+    }
+
+    this.commitMeasuredHeights(measurements);
+  }
+
+  private updateRenderedRowsHeight(measurements: Array<{ height: number | null; key: string | undefined }>): void {
+    const height = measurements.reduce((totalHeight, measurement) => totalHeight + (measurement.height ?? 0), 0);
+
+    if (!height || Math.abs(this.renderedRowsHeight() - height) < 0.5) {
+      return;
+    }
+
+    this.renderedRowsHeight.set(height);
+  }
+
+  private flushPendingMeasurements(): void {
+    if (!this.pendingMeasurements.length) {
+      return;
+    }
+
+    const measurements = this.pendingMeasurements;
+    this.pendingMeasurements = [];
+    this.commitMeasuredHeights(measurements);
+  }
+
+  private commitMeasuredHeights(measurements: Array<{ height: number | null; key: string | undefined }>): void {
+    const scrollRoot = this.scrollRootElement;
+    const previousTotalHeight = this.totalHeight();
+    const previousScrollTop = scrollRoot?.scrollTop ?? 0;
     let changed = false;
 
     this.measuredHeights.update(currentHeights => {
@@ -549,8 +654,26 @@ export class DataTableVirtualScrollComponent<T extends Record<string, unknown>> 
       return;
     }
 
+    this.preserveScrollRatio(previousTotalHeight, previousScrollTop);
     this.syncViewport();
     this.changeDetectorRef.markForCheck();
+  }
+
+  private preserveScrollRatio(previousTotalHeight: number, previousScrollTop: number): void {
+    const scrollRoot = this.scrollRootElement;
+
+    if (!scrollRoot || previousScrollTop <= 0) {
+      return;
+    }
+
+    const previousMaxScrollTop = Math.max(previousTotalHeight - scrollRoot.clientHeight, 0);
+    const nextMaxScrollTop = Math.max(this.totalHeight() - scrollRoot.clientHeight, 0);
+
+    if (previousMaxScrollTop <= 0 || nextMaxScrollTop <= 0) {
+      return;
+    }
+
+    scrollRoot.scrollTop = (previousScrollTop / previousMaxScrollTop) * nextMaxScrollTop;
   }
 
   private heightForElement(element: HTMLElement, entry?: ResizeObserverEntry): number | null {
