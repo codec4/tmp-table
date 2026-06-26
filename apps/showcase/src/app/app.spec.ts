@@ -19,8 +19,10 @@ describe('App', () => {
     expect(fixture.nativeElement.textContent).toContain('Paged API + Virtual Scroll');
     expect(fixture.nativeElement.textContent).toContain('Paged API + Child Row + Virtual Scroll');
     expect(fixture.nativeElement.textContent).toContain('Table + Virtual Scroll');
+    expect(fixture.nativeElement.textContent).toContain('Virtual List + 10,000 Elements');
     expect(fixture.nativeElement.textContent).toContain('Table + Row + Child Row + Virtual Scroll');
     expect(fixture.nativeElement.textContent).toContain('1250 rows');
+    expect(fixture.nativeElement.textContent).toContain('10000 elements');
     expect(fixture.nativeElement.textContent).toContain('fetching 1 page');
     expect(fixture.nativeElement.textContent).toContain('1100 parent rows, 734 with child rows');
     expect(fixture.nativeElement.textContent).toContain('Laptop Pro');

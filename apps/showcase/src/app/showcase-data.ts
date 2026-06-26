@@ -53,6 +53,7 @@ const owners = ['North Ops', 'Channel Team', 'Retail Desk', 'Enterprise'];
 const statuses: ProductStatus[] = ['active', 'review', 'paused'];
 
 export const productRows = createProducts(1250);
+export const largeProductRows = createProducts(10000);
 
 function createProducts(count: number): ProductRow[] {
   return Array.from({ length: count }, (_, index) => {
