@@ -60,6 +60,11 @@ export const provideTableTemplates = (): Provider => ({
   useFactory: () => new Map<string, TemplateRef<unknown>>()
 });
 
+export const withTableRows = <T extends Record<string, unknown>>(rows: TableSignalSource<T[]>): Provider => ({
+  provide: TABLE_DATA,
+  useFactory: () => resolveSignal(rows) as Signal<Record<string, unknown>[]>
+});
+
 export const withDataFormatters = (): Provider[] => [
   CurrencyPipe,
   PercentPipe,

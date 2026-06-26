@@ -1,0 +1,87 @@
+import { ChangeDetectionStrategy, Component, Injectable, inject } from '@angular/core';
+import {
+  DataTableComponent,
+  DataTableTemplateDirective,
+  TABLE_DATA,
+  TABLE_LOADING,
+  provideTableColumns,
+  provideTableTemplates
+} from '@table-provider/data-table';
+import { MockUsersService } from './mock-users.service';
+import { MockUsersVirtualTableStore, PagedUserRow, userColumns } from './mock-users-table';
+
+@Injectable()
+class ContractVirtualScrollTableShowcaseStore extends MockUsersVirtualTableStore {
+  constructor() {
+    super(inject(MockUsersService));
+  }
+}
+
+@Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [DataTableComponent, DataTableTemplateDirective],
+  providers: [
+    MockUsersService,
+    ContractVirtualScrollTableShowcaseStore,
+    provideTableTemplates(),
+    ...provideTableColumns<PagedUserRow>(userColumns),
+    {
+      provide: TABLE_DATA,
+      useFactory: () => inject(ContractVirtualScrollTableShowcaseStore).rows
+    },
+    {
+      provide: TABLE_LOADING,
+      useFactory: () => inject(ContractVirtualScrollTableShowcaseStore).isInitialLoading
+    }
+  ],
+  selector: 'app-contract-virtual-scroll-table-showcase',
+  template: `
+    <section class="mb-14 space-y-4 border-b border-slate-300 pb-14">
+      <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div>
+          <h2 class="text-lg font-semibold text-slate-950">Paged API + Virtual Scroll</h2>
+          <p class="text-sm text-slate-500">
+            Loaded {{ store.loadedCount() }} of {{ store.pagination().totalItems }} users from
+            {{ store.loadedPageCount() }} cached pages
+            @if (store.loadingPageCount()) {
+              <span class="text-slate-400">
+                - fetching {{ store.loadingPageCount() }} page{{ store.loadingPageCount() === 1 ? '' : 's' }}
+              </span>
+            }
+          </p>
+        </div>
+        <code class="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs text-slate-600 shadow-sm">
+          GET /users?page={{ store.pagination().page }}&pageSize={{ store.pageSize }}&status=All&search=
+        </code>
+      </div>
+
+      <ng-template tableTemplate="pagedStatusBadge" let-row let-value="value">
+        <span
+          class="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset"
+          [class.bg-emerald-50]="!row.isPlaceholder && value === 'Active'"
+          [class.text-emerald-700]="!row.isPlaceholder && value === 'Active'"
+          [class.ring-emerald-600/20]="!row.isPlaceholder && value === 'Active'"
+          [class.bg-sky-50]="!row.isPlaceholder && value === 'Invited'"
+          [class.text-sky-700]="!row.isPlaceholder && value === 'Invited'"
+          [class.ring-sky-600/20]="!row.isPlaceholder && value === 'Invited'"
+          [class.bg-slate-100]="row.isPlaceholder || value === 'Suspended'"
+          [class.text-slate-700]="row.isPlaceholder || value === 'Suspended'"
+          [class.ring-slate-600/20]="row.isPlaceholder || value === 'Suspended'"
+        >
+          {{ row.isPlaceholder ? 'Loading' : value }}
+        </span>
+      </ng-template>
+
+      <lib-data-table
+        [virtualScroll]="true"
+        [initialRows]="24"
+        [overscanRows]="24"
+        height="26rem"
+        (rangeChange)="store.loadVisibleRange($event)"
+      />
+    </section>
+  `
+})
+export class ContractVirtualScrollTableShowcaseComponent {
+  readonly store = inject(ContractVirtualScrollTableShowcaseStore);
+}

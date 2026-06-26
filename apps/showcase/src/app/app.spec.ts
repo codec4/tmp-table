@@ -17,6 +17,7 @@ describe('App', () => {
     expect(fixture.nativeElement.textContent).toContain('Product Inventory');
     expect(fixture.nativeElement.textContent).toContain('Pagination');
     expect(fixture.nativeElement.textContent).toContain('Paged API + Virtual Scroll');
+    expect(fixture.nativeElement.textContent).toContain('Paged API + Child Row + Virtual Scroll');
     expect(fixture.nativeElement.textContent).toContain('Table + Virtual Scroll');
     expect(fixture.nativeElement.textContent).toContain('Table + Row + Child Row + Virtual Scroll');
     expect(fixture.nativeElement.textContent).toContain('1250 rows');

@@ -2,27 +2,41 @@
 
 A shared, DI-driven Angular data table library.
 
-The component can also be driven directly with inputs:
+Provide columns and rows near the table:
 
-```html
-<lib-data-table [columns]="columns" [data]="rows" />
+```ts
+@Component({
+  imports: [DataTableComponent],
+  providers: [...provideTableColumns(columns), withTableRows(rows)],
+  template: `
+    <lib-data-table />
+  `
+})
+export class ProductsTable {}
 ```
 
 Use the virtualized table component when the row set is large:
 
-```html
-<lib-data-table
-  [columns]="columns"
-  [data]="rows"
-  [virtualScroll]="true"
-  height="28rem"
-  [initialRows]="25"
-  [overscanRows]="25"
-  [rowHeight]="48"
-  [childRowHeight]="57"
-  [childRowWhen]="hasDetailRow"
-  childRowTemplateKey="details"
-/>
+```ts
+@Component({
+  imports: [DataTableComponent],
+  providers: [...provideTableColumns(columns), withTableRows(rows)],
+  template: `
+    <lib-data-table
+      [virtualScroll]="true"
+      height="28rem"
+      [initialRows]="25"
+      [overscanRows]="25"
+      [rowHeight]="48"
+      [childRowHeight]="57"
+      [childRowWhen]="hasDetailRow"
+      childRowTemplateKey="details"
+    />
+  `
+})
+export class VirtualProductsTable {
+  readonly hasDetailRow = (row: ProductRow) => row.id % 3 !== 0;
+}
 ```
 
 `lib-data-table` uses `IntersectionObserver` sentinels inside the body scroll container when `[virtualScroll]` is
