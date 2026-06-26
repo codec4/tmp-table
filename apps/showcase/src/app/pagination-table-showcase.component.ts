@@ -3,8 +3,8 @@ import {
   DataTableComponent,
   DataTableTemplateDirective,
   TABLE_DATA,
-  provideTableColumns,
-  provideTableTemplates
+  withTableColumns,
+  withTableTemplates
 } from '@table-provider/data-table';
 import { ProductRow, productColumns, productRows } from './showcase-data';
 
@@ -36,8 +36,8 @@ class PaginationTableShowcaseStore {
   imports: [DataTableComponent, DataTableTemplateDirective],
   providers: [
     PaginationTableShowcaseStore,
-    provideTableTemplates(),
-    ...provideTableColumns<ProductRow>(productColumns),
+    withTableTemplates(),
+    ...withTableColumns<ProductRow>(productColumns),
     {
       provide: TABLE_DATA,
       useFactory: () => inject(PaginationTableShowcaseStore).pagedRows

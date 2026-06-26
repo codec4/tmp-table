@@ -2,8 +2,8 @@ import { ChangeDetectionStrategy, Component, computed } from '@angular/core';
 import {
   DataTableComponent,
   DataTableTemplateDirective,
-  provideTableColumns,
-  provideTableTemplates,
+  withTableColumns,
+  withTableTemplates,
   withTableRows
 } from '@table-provider/data-table';
 import { ProductRow, productColumns, productRows } from './showcase-data';
@@ -15,8 +15,8 @@ const hasProductChildRow = (row: ProductRow): boolean => row.id % 3 !== 0;
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [DataTableComponent, DataTableTemplateDirective],
   providers: [
-    provideTableTemplates(),
-    ...provideTableColumns<ProductRow>(productColumns),
+    withTableTemplates(),
+    ...withTableColumns<ProductRow>(productColumns),
     withTableRows<ProductRow>(childRowProducts)
   ],
   selector: 'app-child-row-virtual-scroll-table-showcase',

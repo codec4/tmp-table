@@ -32,21 +32,21 @@ export type DataTableProviderConfig<T extends Record<string, unknown> = Record<s
   scopedTemplates?: boolean;
 };
 
-export const provideDataTable = <T extends Record<string, unknown>>(config: DataTableProviderConfig<T>): Provider[] => {
-  const providers: Provider[] = [...provideTableColumns(config.columns), ...withTableData(config.apiUrl)];
+export const withDataTable = <T extends Record<string, unknown>>(config: DataTableProviderConfig<T>): Provider[] => {
+  const providers: Provider[] = [...withTableColumns(config.columns), ...withTableData(config.apiUrl)];
 
   if (config.formatters !== false) {
     providers.push(...withDataFormatters());
   }
 
   if (config.scopedTemplates) {
-    providers.push(provideTableTemplates());
+    providers.push(withTableTemplates());
   }
 
   return providers;
 };
 
-export const provideTableColumns = <T extends Record<string, unknown>>(columns: TableColumnSource<T>): Provider[] => [
+export const withTableColumns = <T extends Record<string, unknown>>(columns: TableColumnSource<T>): Provider[] => [
   {
     provide: RAW_COLUMNS,
     useValue: columns
@@ -57,10 +57,27 @@ export const provideTableColumns = <T extends Record<string, unknown>>(columns: 
   }
 ];
 
-export const provideTableTemplates = (): Provider => ({
+export const withTableTemplates = (): Provider => ({
   provide: TABLE_TEMPLATES,
   useFactory: () => new Map<string, TemplateRef<unknown>>()
 });
+
+/**
+ * @deprecated Use `withDataTable`.
+ */
+export const provideDataTable = <T extends Record<string, unknown>>(config: DataTableProviderConfig<T>): Provider[] =>
+  withDataTable(config);
+
+/**
+ * @deprecated Use `withTableColumns`.
+ */
+export const provideTableColumns = <T extends Record<string, unknown>>(columns: TableColumnSource<T>): Provider[] =>
+  withTableColumns(columns);
+
+/**
+ * @deprecated Use `withTableTemplates`.
+ */
+export const provideTableTemplates = (): Provider => withTableTemplates();
 
 export const withTableRows = <T extends Record<string, unknown>>(rows: TableSignalSource<T[]>): Provider => ({
   provide: TABLE_DATA,

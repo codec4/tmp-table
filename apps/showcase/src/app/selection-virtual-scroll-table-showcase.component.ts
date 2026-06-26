@@ -4,8 +4,8 @@ import {
   DataTableKey,
   DataTableSelectionOptions,
   DataTableTemplateDirective,
-  provideTableColumns,
-  provideTableTemplates,
+  withTableColumns,
+  withTableTemplates,
   withTableRows,
   withTableSelection
 } from '@table-provider/data-table';
@@ -29,8 +29,8 @@ class SelectionVirtualScrollTableShowcaseStore {
   imports: [DataTableComponent, DataTableTemplateDirective],
   providers: [
     SelectionVirtualScrollTableShowcaseStore,
-    provideTableTemplates(),
-    ...provideTableColumns<ProductRow>(productColumns),
+    withTableTemplates(),
+    ...withTableColumns<ProductRow>(productColumns),
     withTableRows<ProductRow>(largeProductRows),
     withTableSelection<ProductRow>(() => inject(SelectionVirtualScrollTableShowcaseStore).selection)
   ],

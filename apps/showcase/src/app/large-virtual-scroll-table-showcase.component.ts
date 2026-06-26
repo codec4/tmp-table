@@ -2,8 +2,8 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
 import {
   DataTableComponent,
   DataTableTemplateDirective,
-  provideTableColumns,
-  provideTableTemplates,
+  withTableColumns,
+  withTableTemplates,
   withTableRows
 } from '@table-provider/data-table';
 import { ProductRow, largeProductRows, productColumns } from './showcase-data';
@@ -12,8 +12,8 @@ import { ProductRow, largeProductRows, productColumns } from './showcase-data';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [DataTableComponent, DataTableTemplateDirective],
   providers: [
-    provideTableTemplates(),
-    ...provideTableColumns<ProductRow>(productColumns),
+    withTableTemplates(),
+    ...withTableColumns<ProductRow>(productColumns),
     withTableRows<ProductRow>(largeProductRows)
   ],
   selector: 'app-large-virtual-scroll-table-showcase',

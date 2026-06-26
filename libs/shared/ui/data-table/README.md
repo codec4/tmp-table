@@ -7,7 +7,7 @@ Provide columns and rows near the table:
 ```ts
 @Component({
   imports: [DataTableComponent],
-  providers: [...provideTableColumns(columns), withTableRows(rows)],
+  providers: [...withTableColumns(columns), withTableRows(rows)],
   template: `
     <lib-data-table />
   `
@@ -20,7 +20,7 @@ Use the virtualized table component when the row set is large:
 ```ts
 @Component({
   imports: [DataTableComponent],
-  providers: [...provideTableColumns(columns), withTableRows(rows)],
+  providers: [...withTableColumns(columns), withTableRows(rows)],
   template: `
     <div style="height: 32rem">
       <lib-data-table
@@ -49,7 +49,7 @@ const selectedKeys = signal<ReadonlySet<DataTableKey>>(new Set());
 @Component({
   imports: [DataTableComponent],
   providers: [
-    ...provideTableColumns(columns),
+    ...withTableColumns(columns),
     withTableRows(rows),
     withTableSelection<ProductRow>(() => ({
       rowKey: 'id',

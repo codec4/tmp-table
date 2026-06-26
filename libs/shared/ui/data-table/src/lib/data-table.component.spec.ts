@@ -3,8 +3,8 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { DataTableComponent } from './data-table.component';
 import { DataTableTemplateDirective } from './data-table-template.directive';
 import {
-  provideTableColumns,
-  provideTableTemplates,
+  withTableColumns,
+  withTableTemplates,
   withDataFormatters,
   withTableData,
   withTableRows,
@@ -489,8 +489,8 @@ describe('data table components', () => {
 @Component({
   imports: [DataTableComponent, DataTableTemplateDirective],
   providers: [
-    provideTableTemplates(),
-    provideTableColumns<TestRow>([{ key: 'status', header: 'Status', templateKey: 'statusBadge' }]),
+    withTableTemplates(),
+    withTableColumns<TestRow>([{ key: 'status', header: 'Status', templateKey: 'statusBadge' }]),
     withTableData<TestRow>('/api/products')
   ],
   template: `
@@ -539,7 +539,7 @@ class SelectionProviderStore {
   imports: [DataTableComponent],
   providers: [
     SelectionProviderStore,
-    provideTableColumns<TestRow>([{ key: 'name', header: 'Name' }]),
+    withTableColumns<TestRow>([{ key: 'name', header: 'Name' }]),
     withTableRows<TestRow>(createRows(3)),
     withTableSelection<TestRow>(() => {
       const store = inject(SelectionProviderStore);
@@ -643,7 +643,7 @@ class VirtualScrollFillContainerHostComponent {
 
 @Component({
   imports: [DataTableComponent, DataTableTemplateDirective],
-  providers: [provideTableTemplates()],
+  providers: [withTableTemplates()],
   template: `
     <ng-template tableTemplate="details" let-row let-rowIndex="rowIndex">
       <span data-testid="child-row">{{ row.name }} details {{ rowIndex }}</span>
@@ -670,7 +670,7 @@ class VirtualScrollChildRowHostComponent {
 
 @Component({
   imports: [DataTableComponent, DataTableTemplateDirective],
-  providers: [provideTableTemplates()],
+  providers: [withTableTemplates()],
   template: `
     <ng-template tableTemplate="details" let-row let-rowIndex="rowIndex">
       <span data-testid="child-row">{{ row.name }} details {{ rowIndex }}</span>
@@ -706,7 +706,7 @@ const createFixture = async (config: {
   apiUrl: string;
   formatters?: boolean;
 }): Promise<ComponentFixture<DataTableComponent<TestRow>>> => {
-  const providers = [...provideTableColumns<TestRow>(config.columns), ...withTableData<TestRow>(config.apiUrl)];
+  const providers = [...withTableColumns<TestRow>(config.columns), ...withTableData<TestRow>(config.apiUrl)];
 
   if (config.formatters) {
     providers.push(...withDataFormatters());

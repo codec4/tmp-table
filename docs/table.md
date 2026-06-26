@@ -43,7 +43,7 @@ import { rxResource } from '@angular/core/rxjs-interop';
 import { RAW_COLUMNS, COLUMNS, TABLE_DATA, TABLE_LOADING, ColumnDef } from './table.tokens';
 
 /** Base Provider to initialize table configuration */
-export function provideTableColumns(columns: ColumnDef[]) {
+export function withTableColumns(columns: ColumnDef[]) {
   return { provide: RAW_COLUMNS, useValue: columns };
 }
 
@@ -226,7 +226,7 @@ entirely behind the scenes in the `providers` array.
 import { Component, inject } from '@angular/core';
 import { DataTableComponent } from './data-table.component';
 import { TableTemplateDirective } from './table-template.directive';
-import { provideTableColumns, withDataFormatters, withTableData } from './table.providers';
+import { withTableColumns, withDataFormatters, withTableData } from './table.providers';
 import { TABLE_DATA } from './table.tokens';
 
 @Component({
@@ -235,7 +235,7 @@ import { TABLE_DATA } from './table.tokens';
   imports: [DataTableComponent, TableTemplateDirective],
   // 🚀 The true V22 Functional DI Engine Architecture
   providers: [
-    provideTableColumns([
+    withTableColumns([
       { key: 'name', header: 'Product Name' },
       { key: 'price', header: 'Price', formatter: 'currency' },
       { key: 'discount', header: 'Discount', formatter: 'percent' },
@@ -284,5 +284,5 @@ export class AppComponent {
 2. **True Reactive DI**: Dependencies like `TABLE_DATA` are exposed as `Signal<any[]>`. The table component doesn't even
    need `@Input()`; it relies completely on the reactive data flow configured by its parent's DI tree.
 3. **Decoupled Architecture**: You can reuse `<app-data-table />` everywhere. Just attach the
-   `providers: [provideTableColumns(...), withDataFormatters(), withTableData(...)]` to whatever wrapper component needs
-   a table.
+   `providers: [withTableColumns(...), withDataFormatters(), withTableData(...)]` to whatever wrapper component needs a
+   table.

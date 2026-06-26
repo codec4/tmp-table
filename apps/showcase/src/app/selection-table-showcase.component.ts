@@ -4,8 +4,8 @@ import {
   DataTableKey,
   DataTableSelectionOptions,
   DataTableTemplateDirective,
-  provideTableColumns,
-  provideTableTemplates,
+  withTableColumns,
+  withTableTemplates,
   withTableRows,
   withTableSelection
 } from '@table-provider/data-table';
@@ -31,8 +31,8 @@ class SelectionTableShowcaseStore {
   imports: [DataTableComponent, DataTableTemplateDirective],
   providers: [
     SelectionTableShowcaseStore,
-    provideTableTemplates(),
-    ...provideTableColumns<ProductRow>(productColumns),
+    withTableTemplates(),
+    ...withTableColumns<ProductRow>(productColumns),
     withTableRows<ProductRow>(selectionRows),
     withTableSelection<ProductRow>(() => inject(SelectionTableShowcaseStore).selection)
   ],

@@ -6,8 +6,8 @@ import {
   DataTableTemplateDirective,
   TABLE_DATA,
   TABLE_LOADING,
-  provideTableColumns,
-  provideTableTemplates,
+  withTableColumns,
+  withTableTemplates,
   withTableSelection
 } from '@table-provider/data-table';
 import { MockUsersService } from './mock-users.service';
@@ -35,8 +35,8 @@ class ContractSelectionVirtualScrollTableShowcaseStore extends MockUsersVirtualT
   providers: [
     MockUsersService,
     ContractSelectionVirtualScrollTableShowcaseStore,
-    provideTableTemplates(),
-    ...provideTableColumns<PagedUserRow>(userColumns),
+    withTableTemplates(),
+    ...withTableColumns<PagedUserRow>(userColumns),
     {
       provide: TABLE_DATA,
       useFactory: () => inject(ContractSelectionVirtualScrollTableShowcaseStore).rows
