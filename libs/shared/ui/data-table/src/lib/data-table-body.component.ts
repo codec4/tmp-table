@@ -32,7 +32,7 @@ import { ColumnDef, DataTableChildRowPredicate, TABLE_TEMPLATES } from './data-t
         }
 
         @for (column of columns(); track column.key) {
-          <td class="max-w-80 truncate px-4 py-3 text-slate-700" title="{{ row[column.key] ?? '' }}">
+          <td [class]="cellClass(column)" [attr.title]="cellTitle(row, column)">
             @if (templateFor(column); as template) {
               <ng-container
                 *ngTemplateOutlet="
@@ -102,6 +102,36 @@ export class DataTableBodyComponent<T extends Record<string, unknown>> {
     );
   }
 
+  cellClass(column: ColumnDef<T>): string {
+    const classes = ['px-4', 'text-slate-700'];
+
+    if (this.#shouldTruncateCell(column)) {
+      classes.push('max-w-80', 'truncate');
+    }
+
+    if (column.cellKind === 'interactive') {
+      classes.push('py-2', 'align-middle');
+    } else {
+      classes.push('py-3');
+    }
+
+    if (column.cellClass) {
+      classes.push(column.cellClass);
+    }
+
+    return classes.join(' ');
+  }
+
+  cellTitle(row: T, column: ColumnDef<T>): string | null {
+    if (!this.#shouldTruncateCell(column)) {
+      return null;
+    }
+
+    const value = row[column.key];
+
+    return value === undefined || value === null ? null : String(value);
+  }
+
   childRowTemplateFor(row: T, rowIndex: number): TemplateRef<unknown> | undefined {
     const templateKey = this.childRowTemplateKey();
 
@@ -117,6 +147,10 @@ export class DataTableBodyComponent<T extends Record<string, unknown>> {
     }
 
     return this.#templatesRegistry.get(templateKey);
+  }
+
+  #shouldTruncateCell(column: ColumnDef<T>): boolean {
+    return column.truncate ?? column.cellKind !== 'interactive';
   }
 
   rowMeasurementKey(row: T, rowIndex: number, part: VirtualRowPart): string | null {

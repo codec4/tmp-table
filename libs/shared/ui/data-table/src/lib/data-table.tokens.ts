@@ -5,10 +5,13 @@ export type FormatterType = 'currency' | 'percent' | 'decimal';
 export type TableSignalSource<T> = Signal<T> | T | (() => Signal<T> | T);
 
 export type ColumnDef<T extends Record<string, unknown> = Record<string, unknown>> = {
+  cellClass?: string;
+  cellKind?: 'text' | 'interactive';
   key: keyof T & string;
   header: string;
   formatter?: FormatterType;
   templateKey?: string;
+  truncate?: boolean;
   formatFn?: (value: unknown) => unknown;
 };
 

@@ -9,10 +9,13 @@ import { InjectionToken, TemplateRef, Signal } from '@angular/core';
 export type FormatterType = 'currency' | 'percent' | 'decimal';
 
 export interface ColumnDef {
+  cellClass?: string;
+  cellKind?: 'text' | 'interactive';
   key: string;
   header: string;
   formatter?: FormatterType;
   templateKey?: string;
+  truncate?: boolean;
   // This will be dynamically attached by our DI provider
   formatFn?: (value: any) => any;
 }

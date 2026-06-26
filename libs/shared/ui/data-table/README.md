@@ -66,6 +66,24 @@ const selectedKeys = signal<ReadonlySet<DataTableKey>>(new Set());
 export class SelectableProductsTable {}
 ```
 
+Template columns can opt out of text-cell truncation when they render controls:
+
+```ts
+const columns: ColumnDef<ProductRow>[] = [
+  { key: 'name', header: 'Product Name' },
+  {
+    key: 'status',
+    header: 'Status',
+    templateKey: 'statusSelect',
+    cellKind: 'interactive',
+    cellClass: 'min-w-44'
+  }
+];
+```
+
+`cellKind: 'interactive'` removes the default `truncate` and `title` behavior for that cell. Use `truncate: false` for
+the same behavior without changing the cell kind, or `cellClass` to add table-cell classes.
+
 `lib-data-table` uses `IntersectionObserver` sentinels inside the body scroll container when `[virtualScroll]` is
 enabled. It combines estimated row heights, measured rendered row heights, and a fixed-height scroll space to keep only
 the active window plus overscan in the DOM. The rendered row window is translated inside that stable scroll space so the

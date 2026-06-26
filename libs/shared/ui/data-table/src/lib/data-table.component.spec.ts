@@ -137,6 +137,26 @@ describe('data table components', () => {
     expect(cell?.textContent).toContain('Status');
   });
 
+  it('renders interactive template cells without text truncation defaults', async () => {
+    await TestBed.configureTestingModule({
+      imports: [DataTableInteractiveCellHostComponent]
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(DataTableInteractiveCellHostComponent);
+    await render(fixture);
+
+    const select = (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>('[data-testid="status-select"]');
+    const interactiveCell = select?.closest('td');
+    const textCell = (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>('tbody tr td:first-child');
+
+    expect(interactiveCell?.classList.contains('truncate')).toBe(false);
+    expect(interactiveCell?.classList.contains('align-middle')).toBe(true);
+    expect(interactiveCell?.classList.contains('min-w-40')).toBe(true);
+    expect(interactiveCell?.hasAttribute('title')).toBe(false);
+    expect(textCell?.classList.contains('truncate')).toBe(true);
+    expect(textCell?.getAttribute('title')).toBe('Row 01');
+  });
+
   it('selects rows by key and emits selection changes', async () => {
     await TestBed.configureTestingModule({
       imports: [SelectionInputHostComponent]
@@ -501,6 +521,33 @@ describe('data table components', () => {
   `
 })
 class DataTableTemplateHostComponent {}
+
+@Component({
+  imports: [DataTableComponent, DataTableTemplateDirective],
+  providers: [
+    withTableTemplates(),
+    withTableColumns<TestRow>([
+      { key: 'name', header: 'Name' },
+      {
+        cellClass: 'min-w-40',
+        cellKind: 'interactive',
+        key: 'status',
+        header: 'Status',
+        templateKey: 'statusSelect'
+      }
+    ]),
+    withTableRows<TestRow>(createRows(1))
+  ],
+  template: `
+    <ng-template tableTemplate="statusSelect" let-value="value">
+      <select data-testid="status-select" [value]="value">
+        <option value="active">Active</option>
+      </select>
+    </ng-template>
+    <lib-data-table />
+  `
+})
+class DataTableInteractiveCellHostComponent {}
 
 @Component({
   imports: [DataTableComponent],
