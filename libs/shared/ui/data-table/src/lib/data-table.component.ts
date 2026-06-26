@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, Signal, computed, inject, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, Signal, computed, inject, input, isSignal, output } from '@angular/core';
 import { DataTableBodyComponent } from './data-table-body.component';
 import { DataTableVirtualScrollControllerDirective } from './data-table-virtual-scroll-controller.directive';
 import { DataTableVirtualScrollMeasureDirective } from './data-table-virtual-scroll-measure.directive';
@@ -15,8 +15,16 @@ import {
   COLUMNS,
   ColumnDef,
   DataTableChildRowPredicate,
+  DataTableKey,
+  DataTableRowKey,
+  DataTableSelectAllScope,
+  DataTableSelectionChange,
+  DataTableSelectionMode,
+  DataTableSelectionOptions,
+  DataTableSelectionSource,
   TABLE_DATA,
   TABLE_LOADING,
+  TABLE_SELECTION,
   TableColumnSource
 } from './data-table.tokens';
 import { EMPTY_ROWS, resolveColumnSource } from './data-table.utils';
@@ -56,6 +64,17 @@ type NormalizedDataTableVirtualScrollOptions = {
   rowHeight: number;
 };
 
+type NormalizedDataTableSelectionOptions<T extends Record<string, unknown>> = {
+  columnWidth: string;
+  disabled: (row: T, rowIndex: number) => boolean;
+  enabled: boolean;
+  mode: DataTableSelectionMode;
+  onChange?: (change: DataTableSelectionChange<T>) => void;
+  rowKey?: DataTableRowKey<T>;
+  selectAll: DataTableSelectAllScope;
+  selectedKeys: ReadonlySet<DataTableKey>;
+};
+
 @Component({
   selector: 'lib-data-table',
   host: {
@@ -91,12 +110,34 @@ type NormalizedDataTableVirtualScrollOptions = {
           class="sticky top-0 z-20 w-full min-w-full shrink-0 table-fixed border-separate border-spacing-0 text-sm"
         >
           <colgroup>
+            @if (isSelectionEnabled()) {
+              <col [style.width]="selectionColumnWidth()" />
+            }
             @for (column of tableColumns(); track column.key) {
               <col [style.width.%]="columnWidthPercent()" />
             }
           </colgroup>
           <thead class="bg-slate-50">
             <tr>
+              @if (isSelectionEnabled()) {
+                <th
+                  class="border-b border-slate-200 bg-slate-50 px-4 py-3 text-left"
+                  [style.width]="selectionColumnWidth()"
+                >
+                  @if (showsHeaderSelection()) {
+                    <input
+                      class="size-4 rounded border-slate-300 text-blue-700 focus:ring-blue-600"
+                      data-testid="table-header-selection"
+                      type="checkbox"
+                      aria-label="Select rows"
+                      [checked]="areAllSelectableRowsSelected(virtualScrollController.range())"
+                      [disabled]="!hasSelectableRows(virtualScrollController.range())"
+                      [indeterminate]="isSelectionPartiallySelected(virtualScrollController.range())"
+                      (change)="toggleAllRows(virtualScrollController.range())"
+                    />
+                  }
+                </th>
+              }
               @for (column of tableColumns(); track column.key) {
                 <th
                   class="border-b border-slate-200 bg-slate-50 px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500"
@@ -111,6 +152,9 @@ type NormalizedDataTableVirtualScrollOptions = {
         @if (!isLoading() && !rows().length) {
           <table class="w-full min-w-full table-fixed border-separate border-spacing-0 text-sm">
             <colgroup>
+              @if (isSelectionEnabled()) {
+                <col [style.width]="selectionColumnWidth()" />
+              }
               @for (column of tableColumns(); track column.key) {
                 <col [style.width.%]="columnWidthPercent()" />
               }
@@ -123,6 +167,11 @@ type NormalizedDataTableVirtualScrollOptions = {
               [loading]="isLoading()"
               [childRowTemplateKey]="childRowTemplateKey()"
               [childRowWhen]="childRowWhen()"
+              [isRowSelected]="isRowSelected"
+              [isRowSelectionDisabled]="isRowSelectionDisabled"
+              [selectionColumnWidth]="selectionColumnWidth()"
+              [selectionEnabled]="isSelectionEnabled()"
+              (rowSelectionChange)="toggleRowSelection($event.row, $event.rowIndex)"
             ></tbody>
           </table>
         } @else {
@@ -150,6 +199,9 @@ type NormalizedDataTableVirtualScrollOptions = {
                 [style.transform]="bodyTransform(virtualScrollController.topOffset())"
               >
                 <colgroup>
+                  @if (isSelectionEnabled()) {
+                    <col [style.width]="selectionColumnWidth()" />
+                  }
                   @for (column of tableColumns(); track column.key) {
                     <col [style.width.%]="columnWidthPercent()" />
                   }
@@ -163,7 +215,12 @@ type NormalizedDataTableVirtualScrollOptions = {
                   [rowIndexOffset]="virtualScrollController.range().start"
                   [childRowTemplateKey]="childRowTemplateKey()"
                   [childRowWhen]="childRowWhen()"
+                  [isRowSelected]="isRowSelected"
+                  [isRowSelectionDisabled]="isRowSelectionDisabled"
+                  [selectionColumnWidth]="selectionColumnWidth()"
+                  [selectionEnabled]="isSelectionEnabled()"
                   [virtualMeasurement]="true"
+                  (rowSelectionChange)="toggleRowSelection($event.row, $event.rowIndex)"
                 ></tbody>
               </table>
             </div>
@@ -185,6 +242,25 @@ type NormalizedDataTableVirtualScrollOptions = {
         <table class="min-w-full border-separate border-spacing-0 text-sm">
           <thead class="bg-slate-50">
             <tr>
+              @if (isSelectionEnabled()) {
+                <th
+                  class="sticky top-0 z-10 border-b border-slate-200 bg-slate-50 px-4 py-3 text-left"
+                  [style.width]="selectionColumnWidth()"
+                >
+                  @if (showsHeaderSelection()) {
+                    <input
+                      class="size-4 rounded border-slate-300 text-blue-700 focus:ring-blue-600"
+                      data-testid="table-header-selection"
+                      type="checkbox"
+                      aria-label="Select rows"
+                      [checked]="areAllSelectableRowsSelected()"
+                      [disabled]="!hasSelectableRows()"
+                      [indeterminate]="isSelectionPartiallySelected()"
+                      (change)="toggleAllRows()"
+                    />
+                  }
+                </th>
+              }
               @for (column of tableColumns(); track column.key) {
                 <th
                   class="sticky top-0 z-10 border-b border-slate-200 bg-slate-50 px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500"
@@ -202,6 +278,11 @@ type NormalizedDataTableVirtualScrollOptions = {
             [loading]="isLoading()"
             [childRowTemplateKey]="childRowTemplateKey()"
             [childRowWhen]="childRowWhen()"
+            [isRowSelected]="isRowSelected"
+            [isRowSelectionDisabled]="isRowSelectionDisabled"
+            [selectionColumnWidth]="selectionColumnWidth()"
+            [selectionEnabled]="isSelectionEnabled()"
+            (rowSelectionChange)="toggleRowSelection($event.row, $event.rowIndex)"
           ></tbody>
         </table>
 
@@ -223,10 +304,12 @@ export class DataTableComponent<T extends Record<string, unknown>> {
   readonly #injectedRows = inject<Signal<T[]> | null>(TABLE_DATA, { optional: true });
   readonly #injectedColumns = inject<TableColumnSource<T>>(COLUMNS);
   readonly #injectedLoading = inject<Signal<boolean> | null>(TABLE_LOADING, { optional: true });
+  readonly #injectedSelection = inject<Signal<DataTableSelectionSource<T>> | null>(TABLE_SELECTION, { optional: true });
 
   readonly data = input<T[] | null>(null);
   readonly columns = input<ColumnDef<T>[] | null>(null);
   readonly loading = input<boolean | null>(null);
+  readonly selection = input<DataTableSelectionSource<T>>(null);
   readonly virtualScroll = input<boolean | DataTableVirtualScrollOptions>(false);
   readonly fillContainer = input(false);
   readonly height = input<string | null>(null);
@@ -238,6 +321,7 @@ export class DataTableComponent<T extends Record<string, unknown>> {
   readonly childRowTemplateKey = input<string | null>(null);
   readonly childRowWhen = input<DataTableChildRowPredicate<T> | null>(null);
   readonly rangeChange = output<VirtualRowsRange>();
+  readonly selectionChange = output<DataTableSelectionChange<T>>();
 
   readonly virtualScrollOptions = computed(() =>
     normalizeVirtualScrollOptions(this.virtualScroll(), {
@@ -257,6 +341,16 @@ export class DataTableComponent<T extends Record<string, unknown>> {
       key: this.rowKey(row, index)
     }))
   );
+
+  readonly selectionOptions = computed(() =>
+    normalizeSelectionOptions(this.selection() ?? this.#injectedSelection?.() ?? null)
+  );
+
+  readonly isRowSelected = (row: T, rowIndex: number): boolean =>
+    this.selectionOptions().selectedKeys.has(this.selectionKey(row, rowIndex));
+
+  readonly isRowSelectionDisabled = (row: T, rowIndex: number): boolean =>
+    this.selectionOptions().disabled(row, rowIndex);
 
   rows(): T[] {
     return this.data() ?? this.#injectedRows?.() ?? (EMPTY_ROWS as T[]);
@@ -292,6 +386,100 @@ export class DataTableComponent<T extends Record<string, unknown>> {
     return this.rows().slice(range.start, range.end);
   }
 
+  isSelectionEnabled(): boolean {
+    return this.selectionOptions().enabled;
+  }
+
+  selectionColumnWidth(): string {
+    return this.selectionOptions().columnWidth;
+  }
+
+  showsHeaderSelection(): boolean {
+    const options = this.selectionOptions();
+
+    return options.enabled && options.mode === 'multiple' && options.selectAll !== false;
+  }
+
+  hasSelectableRows(range?: VirtualRowsRange): boolean {
+    return this.selectableSelectionRows(range).length > 0;
+  }
+
+  areAllSelectableRowsSelected(range?: VirtualRowsRange): boolean {
+    const rows = this.selectableSelectionRows(range);
+
+    return rows.length > 0 && rows.every(row => this.selectionOptions().selectedKeys.has(row.key));
+  }
+
+  isSelectionPartiallySelected(range?: VirtualRowsRange): boolean {
+    const rows = this.selectableSelectionRows(range);
+
+    if (!rows.length) {
+      return false;
+    }
+
+    const selectedCount = rows.filter(row => this.selectionOptions().selectedKeys.has(row.key)).length;
+
+    return selectedCount > 0 && selectedCount < rows.length;
+  }
+
+  toggleRowSelection(row: T, rowIndex: number): void {
+    const options = this.selectionOptions();
+
+    if (!options.enabled || options.disabled(row, rowIndex)) {
+      return;
+    }
+
+    const key = this.selectionKey(row, rowIndex);
+    const currentKeys = options.selectedKeys;
+    const nextKeys = options.mode === 'single' ? new Set<DataTableKey>() : new Set(currentKeys);
+
+    if (currentKeys.has(key)) {
+      nextKeys.delete(key);
+    } else {
+      nextKeys.add(key);
+    }
+
+    this.emitSelectionChange({
+      nextKeys,
+      previousKeys: currentKeys,
+      row,
+      rowIndex,
+      source: 'row'
+    });
+  }
+
+  toggleAllRows(range?: VirtualRowsRange): void {
+    const options = this.selectionOptions();
+
+    if (!this.showsHeaderSelection()) {
+      return;
+    }
+
+    const rows = this.selectableSelectionRows(range);
+
+    if (!rows.length) {
+      return;
+    }
+
+    const currentKeys = options.selectedKeys;
+    const nextKeys = new Set(currentKeys);
+    const allSelected = rows.every(row => currentKeys.has(row.key));
+
+    for (const row of rows) {
+      if (allSelected) {
+        nextKeys.delete(row.key);
+      } else {
+        nextKeys.add(row.key);
+      }
+    }
+
+    this.emitSelectionChange({
+      nextKeys,
+      previousKeys: currentKeys,
+      source: 'header'
+    });
+  }
+
   fillsVirtualScrollContainer(): boolean {
     return this.virtualScrollOptions().fillContainer;
   }
@@ -317,9 +505,23 @@ export class DataTableComponent<T extends Record<string, unknown>> {
   }
 
   rowKey(row: T, index: number): string {
+    return String(this.selectionKey(row, index));
+  }
+
+  selectionKey(row: T, index: number): DataTableKey {
+    const key = this.selectionOptions().rowKey;
+
+    if (typeof key === 'function') {
+      return normalizedSelectionKey(key(row, index), index);
+    }
+
+    if (key) {
+      return normalizedSelectionKey(row[key], index);
+    }
+
     const id = row['id'];
 
-    return id === undefined || id === null ? `${index}` : String(id);
+    return normalizedSelectionKey(id, index);
   }
 
   hasChildRow(row: T, rowIndex: number): boolean {
@@ -330,6 +532,52 @@ export class DataTableComponent<T extends Record<string, unknown>> {
     const predicate = this.childRowWhen();
 
     return !predicate || predicate(row, rowIndex);
+  }
+
+  selectableSelectionRows(range?: VirtualRowsRange): Array<{ key: DataTableKey; row: T; rowIndex: number }> {
+    const options = this.selectionOptions();
+
+    if (!options.enabled) {
+      return [];
+    }
+
+    const scope = options.selectAll === 'visible' && range ? range : null;
+    const rows = scope ? this.rows().slice(scope.start, scope.end) : this.rows();
+    const rowIndexOffset = scope?.start ?? 0;
+
+    return rows.reduce<Array<{ key: DataTableKey; row: T; rowIndex: number }>>((selectableRows, row, rowIndex) => {
+      const absoluteRowIndex = rowIndexOffset + rowIndex;
+
+      if (!options.disabled(row, absoluteRowIndex)) {
+        selectableRows.push({
+          key: this.selectionKey(row, absoluteRowIndex),
+          row,
+          rowIndex: absoluteRowIndex
+        });
+      }
+
+      return selectableRows;
+    }, []);
+  }
+
+  emitSelectionChange(options: {
+    nextKeys: ReadonlySet<DataTableKey>;
+    previousKeys: ReadonlySet<DataTableKey>;
+    row?: T;
+    rowIndex?: number;
+    source: 'header' | 'row';
+  }): void {
+    const change: DataTableSelectionChange<T> = {
+      addedKeys: difference(options.nextKeys, options.previousKeys),
+      removedKeys: difference(options.previousKeys, options.nextKeys),
+      row: options.row,
+      rowIndex: options.rowIndex,
+      selectedKeys: options.nextKeys,
+      source: options.source
+    };
+
+    this.selectionChange.emit(change);
+    this.selectionOptions().onChange?.(change);
   }
 }
 
@@ -350,4 +598,79 @@ const normalizeVirtualScrollOptions = (
     rootMargin: options.rootMargin ?? fallback.rootMargin,
     rowHeight: options.rowHeight ?? fallback.rowHeight
   };
+};
+
+const normalizeSelectionOptions = <T extends Record<string, unknown>>(
+  selection: DataTableSelectionSource<T>
+): NormalizedDataTableSelectionOptions<T> => {
+  if (!selection) {
+    return {
+      columnWidth: '3rem',
+      disabled: () => false,
+      enabled: false,
+      mode: 'multiple',
+      selectAll: 'data',
+      selectedKeys: new Set()
+    };
+  }
+
+  const options: DataTableSelectionOptions<T> = typeof selection === 'boolean' ? {} : selection;
+
+  return {
+    columnWidth: options.columnWidth ?? '3rem',
+    disabled: options.disabled ?? (() => false),
+    enabled: true,
+    mode: options.mode ?? 'multiple',
+    onChange: options.onChange,
+    rowKey: options.rowKey,
+    selectAll: normalizeSelectAll(options.selectAll),
+    selectedKeys: resolveSelectedKeys(options.selectedKeys)
+  };
+};
+
+const normalizeSelectAll = (selectAll: boolean | DataTableSelectAllScope | undefined): DataTableSelectAllScope => {
+  if (selectAll === false) {
+    return false;
+  }
+
+  if (selectAll === true || selectAll === undefined) {
+    return 'data';
+  }
+
+  return selectAll;
+};
+
+const resolveSelectedKeys = (
+  selectedKeys: DataTableSelectionOptions['selectedKeys'] | undefined
+): ReadonlySet<DataTableKey> => {
+  if (!selectedKeys) {
+    return new Set();
+  }
+
+  if (isSignal(selectedKeys)) {
+    return selectedKeys();
+  }
+
+  if (typeof selectedKeys === 'function') {
+    const resolved = selectedKeys();
+
+    return isSignal(resolved) ? resolved() : resolved;
+  }
+
+  return selectedKeys;
+};
+
+const normalizedSelectionKey = (key: unknown, fallbackIndex: number): DataTableKey =>
+  typeof key === 'string' || typeof key === 'number' ? key : fallbackIndex;
+
+const difference = (left: ReadonlySet<DataTableKey>, right: ReadonlySet<DataTableKey>): ReadonlySet<DataTableKey> => {
+  const next = new Set<DataTableKey>();
+
+  for (const key of left) {
+    if (!right.has(key)) {
+      next.add(key);
+    }
+  }
+
+  return next;
 };

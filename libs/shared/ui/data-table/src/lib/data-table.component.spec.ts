@@ -1,9 +1,16 @@
-import { Component } from '@angular/core';
+import { Component, computed, inject, Injectable, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { DataTableComponent } from './data-table.component';
 import { DataTableTemplateDirective } from './data-table-template.directive';
-import { provideTableColumns, provideTableTemplates, withDataFormatters, withTableData } from './data-table.providers';
-import { ColumnDef } from './data-table.tokens';
+import {
+  provideTableColumns,
+  provideTableTemplates,
+  withDataFormatters,
+  withTableData,
+  withTableRows,
+  withTableSelection
+} from './data-table.providers';
+import { ColumnDef, DataTableKey, DataTableSelectionChange } from './data-table.tokens';
 
 type TestRow = {
   id: number;
@@ -128,6 +135,97 @@ describe('data table components', () => {
     expect(cell?.textContent).toContain('Laptop Pro');
     expect(cell?.textContent).toContain('active');
     expect(cell?.textContent).toContain('Status');
+  });
+
+  it('selects rows by key and emits selection changes', async () => {
+    await TestBed.configureTestingModule({
+      imports: [SelectionInputHostComponent]
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(SelectionInputHostComponent);
+    await render(fixture);
+
+    let rowCheckboxes = rowSelectionInputsFor(fixture);
+
+    expect(rowCheckboxes).toHaveLength(3);
+    expect(rowCheckboxes[0].checked).toBe(false);
+    expect(rowCheckboxes[1].checked).toBe(true);
+    expect(rowCheckboxes[2].disabled).toBe(true);
+
+    rowCheckboxes[0].click();
+    fixture.detectChanges();
+    rowCheckboxes = rowSelectionInputsFor(fixture);
+
+    expect(selectedKeysFor(fixture.componentInstance.selectedKeys)).toEqual([1, 2]);
+    expect(selectedKeysFor(fixture.componentInstance.changes[0]?.addedKeys ?? new Set())).toEqual([1]);
+    expect(rowCheckboxes[0].checked).toBe(true);
+  });
+
+  it('selects all enabled rows from the header checkbox', async () => {
+    await TestBed.configureTestingModule({
+      imports: [SelectionInputHostComponent]
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(SelectionInputHostComponent);
+    fixture.componentInstance.selectedKeys = new Set();
+    await render(fixture);
+
+    const headerCheckbox = headerSelectionInputFor(fixture);
+
+    expect(headerCheckbox.checked).toBe(false);
+    expect(headerCheckbox.indeterminate).toBe(false);
+
+    headerCheckbox.click();
+    fixture.detectChanges();
+
+    expect(selectedKeysFor(fixture.componentInstance.selectedKeys)).toEqual([1, 2]);
+    expect(rowSelectionInputsFor(fixture)[2].checked).toBe(false);
+  });
+
+  it('uses provider-driven selection state', async () => {
+    await TestBed.configureTestingModule({
+      imports: [SelectionProviderHostComponent]
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(SelectionProviderHostComponent);
+    await render(fixture);
+
+    expect(rowSelectionInputsFor(fixture)[0].checked).toBe(true);
+
+    rowSelectionInputsFor(fixture)[1].click();
+    fixture.detectChanges();
+
+    expect(selectedKeysFor(fixture.componentInstance.store.selectedKeys())).toEqual([1, 2]);
+  });
+
+  it('keeps the virtual header checkbox checked after scrolling when select-all targets the data set', async () => {
+    const restoreIntersectionObserver = installMockIntersectionObserver();
+
+    try {
+      await TestBed.configureTestingModule({
+        imports: [VirtualScrollSelectionDataHostComponent]
+      }).compileComponents();
+
+      const fixture = TestBed.createComponent(VirtualScrollSelectionDataHostComponent);
+      await render(fixture);
+
+      headerSelectionInputFor(fixture).click();
+      fixture.detectChanges();
+
+      expect(fixture.componentInstance.selectedKeys.size).toBe(20);
+      expect(headerSelectionInputFor(fixture).checked).toBe(true);
+
+      const scrollRoot = scrollRootFor(fixture);
+      setClientHeight(scrollRoot, 40);
+      scrollRoot.scrollTop = 320;
+      scrollRoot.dispatchEvent(new Event('scroll'));
+      fixture.detectChanges();
+
+      expect(headerSelectionInputFor(fixture).checked).toBe(true);
+      expect(headerSelectionInputFor(fixture).indeterminate).toBe(false);
+    } finally {
+      restoreIntersectionObserver();
+    }
   });
 
   it('renders a bounded virtual-scroll window and moves it when the sentinel intersects', async () => {
@@ -365,6 +463,27 @@ describe('data table components', () => {
       restoreIntersectionObserver();
     }
   });
+
+  it('includes the selection column in child row colspan', async () => {
+    const restoreIntersectionObserver = installMockIntersectionObserver();
+
+    try {
+      await TestBed.configureTestingModule({
+        imports: [VirtualScrollChildRowSelectionHostComponent]
+      }).compileComponents();
+
+      const fixture = TestBed.createComponent(VirtualScrollChildRowSelectionHostComponent);
+      await render(fixture);
+
+      const childCell = (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>(
+        '[data-testid="child-row"]'
+      )?.parentElement;
+
+      expect(childCell?.getAttribute('colspan')).toBe('2');
+    } finally {
+      restoreIntersectionObserver();
+    }
+  });
 });
 
 @Component({
@@ -382,6 +501,88 @@ describe('data table components', () => {
   `
 })
 class DataTableTemplateHostComponent {}
+
+@Component({
+  imports: [DataTableComponent],
+  template: `
+    <lib-data-table
+      [columns]="columns"
+      [data]="rows"
+      [selection]="{
+        rowKey: 'id',
+        selectedKeys: selectedKeys,
+        disabled: isSelectionDisabled
+      }"
+      (selectionChange)="applySelection($event)"
+    />
+  `
+})
+class SelectionInputHostComponent {
+  readonly columns: ColumnDef<TestRow>[] = [{ key: 'name', header: 'Name' }];
+  readonly rows: TestRow[] = createRows(3).map(row => (row.id === 3 ? { ...row, status: 'inactive' } : row));
+  readonly isSelectionDisabled = (row: TestRow): boolean => row.status === 'inactive';
+  changes: DataTableSelectionChange<TestRow>[] = [];
+  selectedKeys: ReadonlySet<DataTableKey> = new Set([2]);
+
+  applySelection(change: DataTableSelectionChange<TestRow>): void {
+    this.changes.push(change);
+    this.selectedKeys = change.selectedKeys;
+  }
+}
+
+@Injectable()
+class SelectionProviderStore {
+  readonly selectedKeys = signal<ReadonlySet<DataTableKey>>(new Set([1]));
+}
+
+@Component({
+  imports: [DataTableComponent],
+  providers: [
+    SelectionProviderStore,
+    provideTableColumns<TestRow>([{ key: 'name', header: 'Name' }]),
+    withTableRows<TestRow>(createRows(3)),
+    withTableSelection<TestRow>(() => {
+      const store = inject(SelectionProviderStore);
+
+      return computed(() => ({
+        rowKey: 'id',
+        selectedKeys: store.selectedKeys()
+      }));
+    })
+  ],
+  template: `
+    <lib-data-table (selectionChange)="store.selectedKeys.set($event.selectedKeys)" />
+  `
+})
+class SelectionProviderHostComponent {
+  readonly store = inject(SelectionProviderStore);
+}
+
+@Component({
+  imports: [DataTableComponent],
+  template: `
+    <lib-data-table
+      [columns]="columns"
+      [data]="rows"
+      [selection]="{
+        rowKey: 'id',
+        selectedKeys: selectedKeys,
+        selectAll: 'data'
+      }"
+      [virtualScroll]="true"
+      [initialRows]="2"
+      [overscanRows]="1"
+      [rowHeight]="20"
+      height="10rem"
+      (selectionChange)="selectedKeys = $event.selectedKeys"
+    />
+  `
+})
+class VirtualScrollSelectionDataHostComponent {
+  readonly columns: ColumnDef<TestRow>[] = [{ key: 'name', header: 'Name' }];
+  readonly rows: TestRow[] = createRows(20);
+  selectedKeys: ReadonlySet<DataTableKey> = new Set();
+}
 
 @Component({
   imports: [DataTableComponent],
@@ -467,6 +668,34 @@ class VirtualScrollChildRowHostComponent {
   readonly hasChildRow = (row: TestRow): boolean => row.id % 2 === 1;
 }
 
+@Component({
+  imports: [DataTableComponent, DataTableTemplateDirective],
+  providers: [provideTableTemplates()],
+  template: `
+    <ng-template tableTemplate="details" let-row let-rowIndex="rowIndex">
+      <span data-testid="child-row">{{ row.name }} details {{ rowIndex }}</span>
+    </ng-template>
+    <lib-data-table
+      [columns]="columns"
+      [data]="rows"
+      [selection]="true"
+      [virtualScroll]="true"
+      [initialRows]="1"
+      [overscanRows]="1"
+      [rowHeight]="20"
+      [childRowHeight]="10"
+      [childRowWhen]="hasChildRow"
+      childRowTemplateKey="details"
+      height="10rem"
+    />
+  `
+})
+class VirtualScrollChildRowSelectionHostComponent {
+  readonly columns: ColumnDef<TestRow>[] = [{ key: 'name', header: 'Name' }];
+  readonly rows: TestRow[] = createRows(20);
+  readonly hasChildRow = (row: TestRow): boolean => row.id % 2 === 1;
+}
+
 const createFixture = async (config: {
   columns: Array<{
     key: keyof TestRow & string;
@@ -504,8 +733,8 @@ const flushVirtualMeasurements = async (fixture: ComponentFixture<unknown>): Pro
   fixture.detectChanges();
 };
 
-const createRows = (count: number): TestRow[] =>
-  Array.from({ length: count }, (_, index) => ({
+function createRows(count: number): TestRow[] {
+  return Array.from({ length: count }, (_, index) => ({
     id: index + 1,
     name: `Row ${String(index + 1).padStart(2, '0')}`,
     price: index + 1,
@@ -513,6 +742,7 @@ const createRows = (count: number): TestRow[] =>
     weight: 1,
     status: 'active'
   }));
+}
 
 class MockIntersectionObserver {
   static instances: MockIntersectionObserver[] = [];
@@ -616,6 +846,26 @@ const transformOffsetFor = (element: HTMLElement): number => {
 
   return match ? Number(match[1]) : 0;
 };
+
+const headerSelectionInputFor = (fixture: ComponentFixture<unknown>): HTMLInputElement => {
+  const input = (fixture.nativeElement as HTMLElement).querySelector<HTMLInputElement>(
+    '[data-testid="table-header-selection"]'
+  );
+
+  if (!input) {
+    throw new Error('Expected header selection checkbox to be rendered.');
+  }
+
+  return input;
+};
+
+const rowSelectionInputsFor = (fixture: ComponentFixture<unknown>): HTMLInputElement[] =>
+  Array.from(
+    (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLInputElement>('[data-testid="table-row-selection"]')
+  );
+
+const selectedKeysFor = (keys: ReadonlySet<DataTableKey>): DataTableKey[] =>
+  Array.from(keys).sort((left, right) => String(left).localeCompare(String(right)));
 
 const rectWithHeight = (height: number): DOMRect => {
   const rect = {

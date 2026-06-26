@@ -1,17 +1,23 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { ChildRowVirtualScrollTableShowcaseComponent } from './child-row-virtual-scroll-table-showcase.component';
 import { ContractChildRowVirtualScrollTableShowcaseComponent } from './contract-child-row-virtual-scroll-table-showcase.component';
+import { ContractSelectionVirtualScrollTableShowcaseComponent } from './contract-selection-virtual-scroll-table-showcase.component';
 import { ContractVirtualScrollTableShowcaseComponent } from './contract-virtual-scroll-table-showcase.component';
 import { LargeVirtualScrollTableShowcaseComponent } from './large-virtual-scroll-table-showcase.component';
 import { PaginationTableShowcaseComponent } from './pagination-table-showcase.component';
+import { SelectionTableShowcaseComponent } from './selection-table-showcase.component';
+import { SelectionVirtualScrollTableShowcaseComponent } from './selection-virtual-scroll-table-showcase.component';
 import { VirtualScrollTableShowcaseComponent } from './virtual-scroll-table-showcase.component';
 
 @Component({
   imports: [
     PaginationTableShowcaseComponent,
+    SelectionTableShowcaseComponent,
     ContractVirtualScrollTableShowcaseComponent,
+    ContractSelectionVirtualScrollTableShowcaseComponent,
     ContractChildRowVirtualScrollTableShowcaseComponent,
     VirtualScrollTableShowcaseComponent,
+    SelectionVirtualScrollTableShowcaseComponent,
     LargeVirtualScrollTableShowcaseComponent,
     ChildRowVirtualScrollTableShowcaseComponent
   ],
@@ -25,9 +31,12 @@ import { VirtualScrollTableShowcaseComponent } from './virtual-scroll-table-show
         </header>
 
         <app-pagination-table-showcase />
+        <app-selection-table-showcase />
         <app-contract-virtual-scroll-table-showcase />
+        <app-contract-selection-virtual-scroll-table-showcase />
         <app-contract-child-row-virtual-scroll-table-showcase />
         <app-virtual-scroll-table-showcase />
+        <app-selection-virtual-scroll-table-showcase />
         <app-large-virtual-scroll-table-showcase />
         <app-child-row-virtual-scroll-table-showcase />
       </section>

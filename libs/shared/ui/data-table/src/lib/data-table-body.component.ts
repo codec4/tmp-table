@@ -1,5 +1,5 @@
 import { NgTemplateOutlet } from '@angular/common';
-import { ChangeDetectionStrategy, Component, TemplateRef, inject, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, TemplateRef, inject, input, output } from '@angular/core';
 import { virtualRowMeasurementKey } from './data-table-virtual-scroll.math';
 import type { VirtualRowPart } from './data-table-virtual-scroll.math';
 import { ColumnDef, DataTableChildRowPredicate, TABLE_TEMPLATES } from './data-table.tokens';
@@ -17,6 +17,20 @@ import { ColumnDef, DataTableChildRowPredicate, TABLE_TEMPLATES } from './data-t
 
     @for (row of rows(); track rowTrackKey(row, $index); let rowIndex = $index) {
       <tr class="hover:bg-slate-50" [attr.data-virtual-row-key]="rowMeasurementKey(row, rowIndex, 'parent')">
+        @if (selectionEnabled()) {
+          <td class="px-4 py-3 align-middle" [style.width]="selectionColumnWidth()">
+            <input
+              class="size-4 rounded border-slate-300 text-blue-700 focus:ring-blue-600"
+              data-testid="table-row-selection"
+              type="checkbox"
+              [attr.aria-label]="rowSelectionLabel(row, rowIndex)"
+              [checked]="isRowSelected()(row, absoluteRowIndex(rowIndex))"
+              [disabled]="isRowSelectionDisabled()(row, absoluteRowIndex(rowIndex))"
+              (change)="toggleRowSelection(row, rowIndex)"
+            />
+          </td>
+        }
+
         @for (column of columns(); track column.key) {
           <td class="max-w-80 truncate px-4 py-3 text-slate-700" title="{{ row[column.key] ?? '' }}">
             @if (templateFor(column); as template) {
@@ -66,10 +80,15 @@ export class DataTableBodyComponent<T extends Record<string, unknown>> {
   readonly rowIndexOffset = input(0);
   readonly childRowTemplateKey = input<string | null>(null);
   readonly childRowWhen = input<DataTableChildRowPredicate<T> | null>(null);
+  readonly isRowSelected = input<(row: T, rowIndex: number) => boolean>(() => false);
+  readonly isRowSelectionDisabled = input<(row: T, rowIndex: number) => boolean>(() => false);
+  readonly selectionColumnWidth = input('3rem');
+  readonly selectionEnabled = input(false);
   readonly virtualMeasurement = input(false);
+  readonly rowSelectionChange = output<{ row: T; rowIndex: number }>();
 
   colspan(): number {
-    return Math.max(this.columns().length, 1);
+    return Math.max(this.columns().length + (this.selectionEnabled() ? 1 : 0), 1);
   }
 
   absoluteRowIndex(rowIndex: number): number {
@@ -118,5 +137,25 @@ export class DataTableBodyComponent<T extends Record<string, unknown>> {
     const id = row['id'];
 
     return id === undefined || id === null ? `${index}` : String(id);
+  }
+
+  rowSelectionLabel(row: T, rowIndex: number): string {
+    const absoluteIndex = this.absoluteRowIndex(rowIndex);
+    const name = row['name'];
+
+    return typeof name === 'string' && name ? `Select row ${name}` : `Select row ${absoluteIndex + 1}`;
+  }
+
+  toggleRowSelection(row: T, rowIndex: number): void {
+    const absoluteIndex = this.absoluteRowIndex(rowIndex);
+
+    if (this.isRowSelectionDisabled()(row, absoluteIndex)) {
+      return;
+    }
+
+    this.rowSelectionChange.emit({
+      row,
+      rowIndex: absoluteIndex
+    });
   }
 }

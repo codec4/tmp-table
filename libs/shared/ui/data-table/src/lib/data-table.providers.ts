@@ -15,9 +15,11 @@ import { NEVER, of } from 'rxjs';
 import {
   COLUMNS,
   ColumnDef,
+  DataTableSelectionSource,
   RAW_COLUMNS,
   TABLE_DATA,
   TABLE_LOADING,
+  TABLE_SELECTION,
   TABLE_TEMPLATES,
   TableColumnSource,
   TableSignalSource
@@ -63,6 +65,13 @@ export const provideTableTemplates = (): Provider => ({
 export const withTableRows = <T extends Record<string, unknown>>(rows: TableSignalSource<T[]>): Provider => ({
   provide: TABLE_DATA,
   useFactory: () => resolveSignal(rows) as Signal<Record<string, unknown>[]>
+});
+
+export const withTableSelection = <T extends Record<string, unknown>>(
+  selection: TableSignalSource<DataTableSelectionSource<T>>
+): Provider => ({
+  provide: TABLE_SELECTION,
+  useFactory: () => resolveSignal(selection) as Signal<DataTableSelectionSource>
 });
 
 export const withDataFormatters = (): Provider[] => [

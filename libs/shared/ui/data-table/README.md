@@ -41,6 +41,31 @@ export class VirtualProductsTable {
 }
 ```
 
+Use `withTableSelection` to add checkbox selection without adding a column definition:
+
+```ts
+const selectedKeys = signal<ReadonlySet<DataTableKey>>(new Set());
+
+@Component({
+  imports: [DataTableComponent],
+  providers: [
+    ...provideTableColumns(columns),
+    withTableRows(rows),
+    withTableSelection<ProductRow>(() => ({
+      rowKey: 'id',
+      selectedKeys,
+      disabled: row => row.status === 'paused',
+      selectAll: 'data',
+      onChange: change => selectedKeys.set(change.selectedKeys)
+    }))
+  ],
+  template: `
+    <lib-data-table />
+  `
+})
+export class SelectableProductsTable {}
+```
+
 `lib-data-table` uses `IntersectionObserver` sentinels inside the body scroll container when `[virtualScroll]` is
 enabled. It combines estimated row heights, measured rendered row heights, and a fixed-height scroll space to keep only
 the active window plus overscan in the DOM. The rendered row window is translated inside that stable scroll space so the
@@ -57,5 +82,9 @@ flexes under the sticky header.
 Use `(rangeChange)` to connect virtual scrolling to a server-paged data source. The event reports the zero-based parent
 row range currently requested by the virtual window, which can be translated to `page` and `pageSize` requests while the
 table renders cached rows and placeholders for unloaded indexes.
+
+Selection is key-based, so it remains stable while virtual rows are removed from the DOM or server pages are replaced.
+The header checkbox can select all rows in the current data set with `selectAll: 'data'` or only the rendered virtual
+window with `selectAll: 'visible'`. Child rows do not get their own checkboxes; their parent row owns selection.
 
 Run `nx test data-table` to execute the unit tests.
