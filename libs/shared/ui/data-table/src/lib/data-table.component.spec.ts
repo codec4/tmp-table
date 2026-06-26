@@ -1,7 +1,6 @@
 import { Component } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { DataTableComponent } from './data-table.component';
-import { DataTableVirtualScrollComponent } from './data-table-virtual-scroll.component';
 import { DataTableTemplateDirective } from './data-table-template.directive';
 import { provideTableColumns, provideTableTemplates, withDataFormatters, withTableData } from './data-table.providers';
 import { ColumnDef } from './data-table.tokens';
@@ -347,11 +346,12 @@ describe('data table components', () => {
 class DataTableTemplateHostComponent {}
 
 @Component({
-  imports: [DataTableVirtualScrollComponent],
+  imports: [DataTableComponent],
   template: `
-    <lib-data-table-virtual-scroll
+    <lib-data-table
       [columns]="columns"
       [data]="rows"
+      [virtualScroll]="true"
       [initialRows]="2"
       [overscanRows]="1"
       [rowHeight]="20"
@@ -367,15 +367,16 @@ class VirtualScrollHostComponent {
 }
 
 @Component({
-  imports: [DataTableVirtualScrollComponent, DataTableTemplateDirective],
+  imports: [DataTableComponent, DataTableTemplateDirective],
   providers: [provideTableTemplates()],
   template: `
     <ng-template tableTemplate="details" let-row let-rowIndex="rowIndex">
       <span data-testid="child-row">{{ row.name }} details {{ rowIndex }}</span>
     </ng-template>
-    <lib-data-table-virtual-scroll
+    <lib-data-table
       [columns]="columns"
       [data]="rows"
+      [virtualScroll]="true"
       [initialRows]="1"
       [overscanRows]="1"
       [rowHeight]="20"

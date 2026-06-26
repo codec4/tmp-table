@@ -3,7 +3,6 @@ import {
   ColumnDef,
   DataTableComponent,
   DataTableTemplateDirective,
-  DataTableVirtualScrollComponent,
   provideTableTemplates
 } from '@table-provider/data-table';
 import { MockUsersService, PagedResponse, UserRow } from './mock-users.service';
@@ -157,7 +156,7 @@ class PaginationTableShowcaseComponent {
 }
 
 @Component({
-  imports: [DataTableVirtualScrollComponent, DataTableTemplateDirective],
+  imports: [DataTableComponent, DataTableTemplateDirective],
   providers: [provideTableTemplates(), MockUsersService],
   selector: 'app-contract-virtual-scroll-table-showcase',
   template: `
@@ -196,10 +195,11 @@ class PaginationTableShowcaseComponent {
         </span>
       </ng-template>
 
-      <lib-data-table-virtual-scroll
+      <lib-data-table
         [columns]="columns"
         [data]="rows()"
         [loading]="isInitialLoading()"
+        [virtualScroll]="true"
         [initialRows]="24"
         [overscanRows]="24"
         height="26rem"
@@ -300,7 +300,7 @@ class ContractVirtualScrollTableShowcaseComponent {
 }
 
 @Component({
-  imports: [DataTableVirtualScrollComponent, DataTableTemplateDirective],
+  imports: [DataTableComponent, DataTableTemplateDirective],
   providers: [provideTableTemplates()],
   selector: 'app-virtual-scroll-table-showcase',
   template: `
@@ -327,9 +327,10 @@ class ContractVirtualScrollTableShowcaseComponent {
         </span>
       </ng-template>
 
-      <lib-data-table-virtual-scroll
+      <lib-data-table
         [columns]="columns"
         [data]="rows"
+        [virtualScroll]="true"
         [initialRows]="24"
         [overscanRows]="24"
         height="26rem"
@@ -344,7 +345,7 @@ class VirtualScrollTableShowcaseComponent {
 }
 
 @Component({
-  imports: [DataTableVirtualScrollComponent, DataTableTemplateDirective],
+  imports: [DataTableComponent, DataTableTemplateDirective],
   providers: [provideTableTemplates()],
   selector: 'app-child-row-virtual-scroll-table-showcase',
   template: `
@@ -380,9 +381,10 @@ class VirtualScrollTableShowcaseComponent {
         </div>
       </ng-template>
 
-      <lib-data-table-virtual-scroll
+      <lib-data-table
         [columns]="columns"
         [data]="rows"
+        [virtualScroll]="true"
         [initialRows]="16"
         [overscanRows]="16"
         [childRowWhen]="hasChildRow"

@@ -1,12 +1,22 @@
-import { NgTemplateOutlet } from '@angular/common';
-import { ChangeDetectionStrategy, Component, Signal, TemplateRef, inject, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, Signal, computed, inject, input, output } from '@angular/core';
+import { DataTableBodyComponent } from './data-table-body.component';
+import { DataTableVirtualScrollControllerDirective } from './data-table-virtual-scroll-controller.directive';
+import { DataTableVirtualScrollMeasureDirective } from './data-table-virtual-scroll-measure.directive';
+import {
+  DEFAULT_VIRTUAL_SCROLL_CHILD_ROW_HEIGHT,
+  DEFAULT_VIRTUAL_SCROLL_INITIAL_ROWS,
+  DEFAULT_VIRTUAL_SCROLL_OVERSCAN_ROWS,
+  DEFAULT_VIRTUAL_SCROLL_ROW_HEIGHT
+} from './data-table-virtual-scroll.math';
+import type { VirtualRowsRange } from './data-table-virtual-scroll.math';
+import { DataTableVirtualScrollSentinelDirective } from './data-table-virtual-scroll-sentinel.directive';
+import { DataTableVirtualScrollViewportDirective } from './data-table-virtual-scroll-viewport.directive';
 import {
   COLUMNS,
   ColumnDef,
   DataTableChildRowPredicate,
   TABLE_DATA,
   TABLE_LOADING,
-  TABLE_TEMPLATES,
   TableColumnSource
 } from './data-table.tokens';
 import { EMPTY_ROWS, resolveColumnSource } from './data-table.utils';
@@ -24,104 +34,215 @@ export type DataTableChildRowContext<T extends Record<string, unknown> = Record<
   rowIndex: number;
 };
 
+export type DataTableVirtualScrollOptions = {
+  childRowHeight?: number;
+  enabled?: boolean;
+  height?: string | null;
+  initialRows?: number;
+  overscanRows?: number;
+  rootMargin?: string;
+  rowHeight?: number;
+};
+
+type NormalizedDataTableVirtualScrollOptions = {
+  childRowHeight: number;
+  enabled: boolean;
+  height: string | null;
+  initialRows: number;
+  overscanRows: number;
+  rootMargin: string;
+  rowHeight: number;
+};
+
 @Component({
   selector: 'lib-data-table',
-  imports: [NgTemplateOutlet],
+  imports: [
+    DataTableBodyComponent,
+    DataTableVirtualScrollControllerDirective,
+    DataTableVirtualScrollMeasureDirective,
+    DataTableVirtualScrollSentinelDirective,
+    DataTableVirtualScrollViewportDirective
+  ],
   template: `
-    <div class="relative overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
-      <table class="min-w-full border-separate border-spacing-0 text-sm">
-        <thead class="bg-slate-50">
-          <tr>
+    @if (isVirtualScrollEnabled()) {
+      <div
+        class="relative overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"
+        dataTableVirtualScrollController
+        #virtualScrollController="dataTableVirtualScrollController"
+        [dataTableVirtualScrollRows]="virtualRows()"
+        [dataTableVirtualScrollInitialRows]="virtualScrollOptions().initialRows"
+        [dataTableVirtualScrollOverscanRows]="virtualScrollOptions().overscanRows"
+        [dataTableVirtualScrollRowHeight]="virtualScrollOptions().rowHeight"
+        [dataTableVirtualScrollChildRowHeight]="virtualScrollOptions().childRowHeight"
+        [dataTableVirtualScrollRootMargin]="virtualScrollOptions().rootMargin"
+        (dataTableVirtualScrollRangeChange)="rangeChange.emit($event)"
+      >
+        <table class="sticky top-0 z-20 w-full min-w-full table-fixed border-separate border-spacing-0 text-sm">
+          <colgroup>
             @for (column of tableColumns(); track column.key) {
-              <th
-                class="sticky top-0 z-10 border-b border-slate-200 bg-slate-50 px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500"
-              >
-                {{ column.header }}
-              </th>
+              <col [style.width.%]="columnWidthPercent()" />
             }
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-100">
-          @if (!isLoading() && !rows().length) {
+          </colgroup>
+          <thead class="bg-slate-50">
             <tr>
-              <td class="px-4 py-8 text-center text-sm text-slate-500" [attr.colspan]="colspan()">
-                No results available
-              </td>
-            </tr>
-          }
-          @for (row of rows(); track rowKey(row, $index); let rowIndex = $index) {
-            <tr class="hover:bg-slate-50">
               @for (column of tableColumns(); track column.key) {
-                <td class="max-w-80 truncate px-4 py-3 text-slate-700" title="{{ row[column.key] ?? '' }}">
-                  @if (templateFor(column); as template) {
-                    <ng-container
-                      *ngTemplateOutlet="
-                        template;
-                        context: {
-                          $implicit: row,
-                          row: row,
-                          value: row[column.key],
-                          column: column
-                        }
-                      "
-                    />
-                  } @else {
-                    {{ row[column.key] }}
-                  }
-                </td>
+                <th
+                  class="border-b border-slate-200 bg-slate-50 px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500"
+                >
+                  {{ column.header }}
+                </th>
               }
             </tr>
-            @if (childRowTemplateFor(row, rowIndex); as childTemplate) {
-              <tr class="bg-slate-200/80">
-                <td class="border-t border-slate-100 px-4 py-3 text-slate-600" [attr.colspan]="colspan()">
-                  <ng-container
-                    *ngTemplateOutlet="
-                      childTemplate;
-                      context: {
-                        $implicit: row,
-                        row: row,
-                        rowIndex: rowIndex
-                      }
-                    "
-                  />
-                </td>
-              </tr>
-            }
-          }
-        </tbody>
-      </table>
+          </thead>
+        </table>
 
-      @if (isLoading()) {
-        <div class="absolute inset-0 z-10 flex items-center justify-center bg-white/65">
+        @if (!isLoading() && !rows().length) {
+          <table class="w-full min-w-full table-fixed border-separate border-spacing-0 text-sm">
+            <colgroup>
+              @for (column of tableColumns(); track column.key) {
+                <col [style.width.%]="columnWidthPercent()" />
+              }
+            </colgroup>
+            <tbody
+              class="divide-y divide-slate-100"
+              libDataTableBody
+              [rows]="rows()"
+              [columns]="tableColumns()"
+              [loading]="isLoading()"
+              [childRowTemplateKey]="childRowTemplateKey()"
+              [childRowWhen]="childRowWhen()"
+            ></tbody>
+          </table>
+        } @else {
           <div
-            class="size-10 animate-spin rounded-full border-4 border-blue-100 border-t-blue-700"
-            role="status"
-            aria-label="Loading rows"
-          ></div>
-        </div>
-      }
-    </div>
+            class="relative overflow-auto"
+            data-testid="table-scroll-root"
+            dataTableVirtualScrollViewport
+            [style.max-height]="virtualScrollOptions().height"
+            style="overflow-anchor: none"
+          >
+            <div
+              class="relative min-w-full overflow-hidden"
+              data-testid="virtual-scroll-space"
+              [style.height.px]="virtualScrollController.totalHeight()"
+            >
+              <div class="absolute left-0 top-0 h-px w-px" dataTableVirtualScrollSentinel aria-hidden="true"></div>
+              <div class="absolute bottom-0 left-0 h-px w-px" dataTableVirtualScrollSentinel aria-hidden="true"></div>
+
+              <table
+                class="absolute left-0 top-0 w-full min-w-full table-fixed border-separate border-spacing-0 text-sm will-change-transform"
+                dataTableVirtualScrollMeasure
+                [style.transform]="bodyTransform(virtualScrollController.topOffset())"
+              >
+                <colgroup>
+                  @for (column of tableColumns(); track column.key) {
+                    <col [style.width.%]="columnWidthPercent()" />
+                  }
+                </colgroup>
+                <tbody
+                  class="divide-y divide-slate-100"
+                  libDataTableBody
+                  [rows]="visibleRows(virtualScrollController.range())"
+                  [columns]="tableColumns()"
+                  [loading]="isLoading()"
+                  [rowIndexOffset]="virtualScrollController.range().start"
+                  [childRowTemplateKey]="childRowTemplateKey()"
+                  [childRowWhen]="childRowWhen()"
+                  [virtualMeasurement]="true"
+                ></tbody>
+              </table>
+            </div>
+          </div>
+        }
+
+        @if (isLoading()) {
+          <div class="absolute inset-0 z-10 flex items-center justify-center bg-white/65">
+            <div
+              class="size-10 animate-spin rounded-full border-4 border-blue-100 border-t-blue-700"
+              role="status"
+              aria-label="Loading rows"
+            ></div>
+          </div>
+        }
+      </div>
+    } @else {
+      <div class="relative overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
+        <table class="min-w-full border-separate border-spacing-0 text-sm">
+          <thead class="bg-slate-50">
+            <tr>
+              @for (column of tableColumns(); track column.key) {
+                <th
+                  class="sticky top-0 z-10 border-b border-slate-200 bg-slate-50 px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500"
+                >
+                  {{ column.header }}
+                </th>
+              }
+            </tr>
+          </thead>
+          <tbody
+            class="divide-y divide-slate-100"
+            libDataTableBody
+            [rows]="rows()"
+            [columns]="tableColumns()"
+            [loading]="isLoading()"
+            [childRowTemplateKey]="childRowTemplateKey()"
+            [childRowWhen]="childRowWhen()"
+          ></tbody>
+        </table>
+
+        @if (isLoading()) {
+          <div class="absolute inset-0 z-10 flex items-center justify-center bg-white/65">
+            <div
+              class="size-10 animate-spin rounded-full border-4 border-blue-100 border-t-blue-700"
+              role="status"
+              aria-label="Loading rows"
+            ></div>
+          </div>
+        }
+      </div>
+    }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class DataTableComponent<T extends Record<string, unknown>> {
-  private readonly injectedRows = inject<Signal<T[]> | null>(TABLE_DATA, {
-    optional: true
-  });
-  private readonly injectedColumns = inject<TableColumnSource<T>>(COLUMNS);
-  private readonly injectedLoading = inject<Signal<boolean> | null>(TABLE_LOADING, {
-    optional: true
-  });
-  private readonly templatesRegistry = inject(TABLE_TEMPLATES);
+  readonly #injectedRows = inject<Signal<T[]> | null>(TABLE_DATA, { optional: true });
+  readonly #injectedColumns = inject<TableColumnSource<T>>(COLUMNS);
+  readonly #injectedLoading = inject<Signal<boolean> | null>(TABLE_LOADING, { optional: true });
 
   readonly data = input<T[] | null>(null);
   readonly columns = input<ColumnDef<T>[] | null>(null);
   readonly loading = input<boolean | null>(null);
+  readonly virtualScroll = input<boolean | DataTableVirtualScrollOptions>(false);
+  readonly height = input<string | null>(null);
+  readonly initialRows = input(DEFAULT_VIRTUAL_SCROLL_INITIAL_ROWS);
+  readonly overscanRows = input(DEFAULT_VIRTUAL_SCROLL_OVERSCAN_ROWS);
+  readonly rowHeight = input(DEFAULT_VIRTUAL_SCROLL_ROW_HEIGHT);
+  readonly childRowHeight = input(DEFAULT_VIRTUAL_SCROLL_CHILD_ROW_HEIGHT);
+  readonly rootMargin = input('240px 0px');
   readonly childRowTemplateKey = input<string | null>(null);
   readonly childRowWhen = input<DataTableChildRowPredicate<T> | null>(null);
+  readonly rangeChange = output<VirtualRowsRange>();
+
+  readonly virtualScrollOptions = computed(() =>
+    normalizeVirtualScrollOptions(this.virtualScroll(), {
+      childRowHeight: this.childRowHeight(),
+      height: this.height(),
+      initialRows: this.initialRows(),
+      overscanRows: this.overscanRows(),
+      rootMargin: this.rootMargin(),
+      rowHeight: this.rowHeight()
+    })
+  );
+
+  readonly virtualRows = computed(() =>
+    this.rows().map((row, index) => ({
+      hasChildRow: this.hasChildRow(row, index),
+      key: this.rowKey(row, index)
+    }))
+  );
 
   rows(): T[] {
-    return this.data() ?? this.injectedRows?.() ?? (EMPTY_ROWS as T[]);
+    return this.data() ?? this.#injectedRows?.() ?? (EMPTY_ROWS as T[]);
   }
 
   tableColumns(): ColumnDef<T>[] {
@@ -131,38 +252,27 @@ export class DataTableComponent<T extends Record<string, unknown>> {
       return columns;
     }
 
-    return resolveColumnSource(this.injectedColumns);
+    return resolveColumnSource(this.#injectedColumns);
   }
 
   isLoading(): boolean {
-    return this.loading() ?? this.injectedLoading?.() ?? false;
+    return this.loading() ?? this.#injectedLoading?.() ?? false;
   }
 
-  templateFor(column: { key: string; templateKey?: string }): TemplateRef<unknown> | undefined {
-    return (
-      (column.templateKey ? this.templatesRegistry.get(column.templateKey) : undefined) ??
-      this.templatesRegistry.get(column.key)
-    );
+  isVirtualScrollEnabled(): boolean {
+    return this.virtualScrollOptions().enabled;
   }
 
-  colspan(): number {
-    return Math.max(this.tableColumns().length, 1);
+  columnWidthPercent(): number {
+    return 100 / Math.max(this.tableColumns().length, 1);
   }
 
-  childRowTemplateFor(row: T, rowIndex: number): TemplateRef<unknown> | undefined {
-    const templateKey = this.childRowTemplateKey();
+  bodyTransform(topOffset: number): string {
+    return `translateY(${topOffset}px)`;
+  }
 
-    if (!templateKey) {
-      return undefined;
-    }
-
-    const predicate = this.childRowWhen();
-
-    if (predicate && !predicate(row, rowIndex)) {
-      return undefined;
-    }
-
-    return this.templatesRegistry.get(templateKey);
+  visibleRows(range: VirtualRowsRange): T[] {
+    return this.rows().slice(range.start, range.end);
   }
 
   rowKey(row: T, index: number): string {
@@ -170,4 +280,32 @@ export class DataTableComponent<T extends Record<string, unknown>> {
 
     return id === undefined || id === null ? `${index}` : String(id);
   }
+
+  hasChildRow(row: T, rowIndex: number): boolean {
+    if (!this.childRowTemplateKey()) {
+      return false;
+    }
+
+    const predicate = this.childRowWhen();
+
+    return !predicate || predicate(row, rowIndex);
+  }
 }
+
+const normalizeVirtualScrollOptions = (
+  virtualScroll: boolean | DataTableVirtualScrollOptions,
+  fallback: Omit<NormalizedDataTableVirtualScrollOptions, 'enabled'>
+): NormalizedDataTableVirtualScrollOptions => {
+  const options = typeof virtualScroll === 'object' && virtualScroll !== null ? virtualScroll : {};
+  const enabled = typeof virtualScroll === 'boolean' ? virtualScroll : options.enabled !== false;
+
+  return {
+    childRowHeight: options.childRowHeight ?? fallback.childRowHeight,
+    enabled,
+    height: options.height ?? fallback.height ?? '28rem',
+    initialRows: options.initialRows ?? fallback.initialRows,
+    overscanRows: options.overscanRows ?? fallback.overscanRows,
+    rootMargin: options.rootMargin ?? fallback.rootMargin,
+    rowHeight: options.rowHeight ?? fallback.rowHeight
+  };
+};
