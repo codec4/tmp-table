@@ -78,6 +78,22 @@ describe('data table components', () => {
     expect(fixture.nativeElement.querySelector('[aria-label="Loading rows"]')).toBeTruthy();
   });
 
+  it('reserves virtual body height while initially loading rows', async () => {
+    await TestBed.configureTestingModule({
+      imports: [VirtualScrollInitialLoadingHostComponent]
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(VirtualScrollInitialLoadingHostComponent);
+    fixture.detectChanges();
+
+    const scrollRoot = scrollRootFor(fixture);
+
+    expect(scrollRoot.style.maxHeight).toBe('10rem');
+    expect(scrollRoot.style.minHeight).toBe('10rem');
+    expect(fixture.nativeElement.querySelector('[aria-label="Loading rows"]')).toBeTruthy();
+    expect(fixture.nativeElement.textContent).not.toContain('No results available');
+  });
+
   it('renders a custom template with row, value, and column context', async () => {
     await TestBed.configureTestingModule({
       imports: [DataTableTemplateHostComponent]
@@ -364,6 +380,23 @@ class VirtualScrollHostComponent {
   readonly columns: ColumnDef<TestRow>[] = [{ key: 'name', header: 'Name' }];
   readonly rows: TestRow[] = createRows(20);
   readonly ranges: Array<{ end: number; start: number }> = [];
+}
+
+@Component({
+  imports: [DataTableComponent],
+  template: `
+    <lib-data-table
+      [columns]="columns"
+      [data]="[]"
+      [loading]="true"
+      [virtualScroll]="true"
+      [rowHeight]="20"
+      height="10rem"
+    />
+  `
+})
+class VirtualScrollInitialLoadingHostComponent {
+  readonly columns: ColumnDef<TestRow>[] = [{ key: 'name', header: 'Name' }];
 }
 
 @Component({

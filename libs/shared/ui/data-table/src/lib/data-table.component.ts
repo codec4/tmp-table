@@ -119,6 +119,7 @@ type NormalizedDataTableVirtualScrollOptions = {
             data-testid="table-scroll-root"
             dataTableVirtualScrollViewport
             [style.max-height]="virtualScrollOptions().height"
+            [style.min-height]="virtualScrollBodyMinHeight()"
             style="overflow-anchor: none"
           >
             <div
@@ -273,6 +274,10 @@ export class DataTableComponent<T extends Record<string, unknown>> {
 
   visibleRows(range: VirtualRowsRange): T[] {
     return this.rows().slice(range.start, range.end);
+  }
+
+  virtualScrollBodyMinHeight(): string | null {
+    return this.isLoading() && !this.rows().length ? this.virtualScrollOptions().height : null;
   }
 
   rowKey(row: T, index: number): string {
