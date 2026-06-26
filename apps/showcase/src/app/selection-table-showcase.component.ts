@@ -32,7 +32,7 @@ class SelectionTableShowcaseStore {
   providers: [
     SelectionTableShowcaseStore,
     withTableTemplates(),
-    ...withTableColumns<ProductRow>(productColumns),
+    withTableColumns<ProductRow>(productColumns),
     withTableRows<ProductRow>(selectionRows),
     withTableSelection<ProductRow>(() => inject(SelectionTableShowcaseStore).selection)
   ],

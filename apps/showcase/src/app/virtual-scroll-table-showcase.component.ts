@@ -13,7 +13,7 @@ import { ProductRow, productColumns, productRows } from './showcase-data';
   imports: [DataTableComponent, DataTableTemplateDirective],
   providers: [
     withTableTemplates(),
-    ...withTableColumns<ProductRow>(productColumns),
+    withTableColumns<ProductRow>(productColumns),
     withTableRows<ProductRow>(productRows)
   ],
   selector: 'app-virtual-scroll-table-showcase',

@@ -37,7 +37,7 @@ class PaginationTableShowcaseStore {
   providers: [
     PaginationTableShowcaseStore,
     withTableTemplates(),
-    ...withTableColumns<ProductRow>(productColumns),
+    withTableColumns<ProductRow>(productColumns),
     {
       provide: TABLE_DATA,
       useFactory: () => inject(PaginationTableShowcaseStore).pagedRows

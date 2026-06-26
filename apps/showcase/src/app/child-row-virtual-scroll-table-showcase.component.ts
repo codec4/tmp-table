@@ -16,7 +16,7 @@ const hasProductChildRow = (row: ProductRow): boolean => row.id % 3 !== 0;
   imports: [DataTableComponent, DataTableTemplateDirective],
   providers: [
     withTableTemplates(),
-    ...withTableColumns<ProductRow>(productColumns),
+    withTableColumns<ProductRow>(productColumns),
     withTableRows<ProductRow>(childRowProducts)
   ],
   selector: 'app-child-row-virtual-scroll-table-showcase',

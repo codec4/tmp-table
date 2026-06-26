@@ -24,7 +24,7 @@ class ContractVirtualScrollTableShowcaseStore extends MockUsersVirtualTableStore
     MockUsersService,
     ContractVirtualScrollTableShowcaseStore,
     withTableTemplates(),
-    ...withTableColumns<PagedUserRow>(userColumns),
+    withTableColumns<PagedUserRow>(userColumns),
     {
       provide: TABLE_DATA,
       useFactory: () => inject(ContractVirtualScrollTableShowcaseStore).rows

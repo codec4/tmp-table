@@ -33,7 +33,7 @@ export type DataTableProviderConfig<T extends Record<string, unknown> = Record<s
 };
 
 export const withDataTable = <T extends Record<string, unknown>>(config: DataTableProviderConfig<T>): Provider[] => {
-  const providers: Provider[] = [...withTableColumns(config.columns), ...withTableData(config.apiUrl)];
+  const providers: Provider[] = [withTableColumns(config.columns), ...withTableData(config.apiUrl)];
 
   if (config.formatters !== false) {
     providers.push(...withDataFormatters());
@@ -46,7 +46,7 @@ export const withDataTable = <T extends Record<string, unknown>>(config: DataTab
   return providers;
 };
 
-export const withTableColumns = <T extends Record<string, unknown>>(columns: TableColumnSource<T>): Provider[] => [
+export const withTableColumns = <T extends Record<string, unknown>>(columns: TableColumnSource<T>): Provider => [
   {
     provide: RAW_COLUMNS,
     useValue: columns

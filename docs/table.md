@@ -37,19 +37,25 @@ This is where the magic happens. We construct the DI tree. `withDataFormatters` 
 stream.
 
 ```typescript
-import { inject, computed, makeEnvironmentProviders } from '@angular/core';
+import { inject, computed } from '@angular/core';
 import { CurrencyPipe, PercentPipe, DecimalPipe } from '@angular/common';
 import { rxResource } from '@angular/core/rxjs-interop';
 import { RAW_COLUMNS, COLUMNS, TABLE_DATA, TABLE_LOADING, ColumnDef } from './table.tokens';
 
 /** Base Provider to initialize table configuration */
 export function withTableColumns(columns: ColumnDef[]) {
-  return { provide: RAW_COLUMNS, useValue: columns };
+  return [
+    { provide: RAW_COLUMNS, useValue: columns },
+    {
+      provide: COLUMNS,
+      useFactory: () => inject(RAW_COLUMNS)
+    }
+  ];
 }
 
 /** Provider that maps columns and injects formatters via Pipes */
 export function withDataFormatters() {
-  return makeEnvironmentProviders([
+  return [
     // Provide pipes to the DI environment so they can be injected
     CurrencyPipe,
     PercentPipe,
@@ -85,12 +91,12 @@ export function withDataFormatters() {
         });
       }
     }
-  ]);
+  ];
 }
 
 /** Provider that fetches data and reactively applies the mapped formatters */
 export function withTableData(apiUrl: string) {
-  return makeEnvironmentProviders([
+  return [
     {
       provide: TABLE_LOADING,
       useFactory: () => inject(TABLE_DATA_RESOURCE).isLoading // Hidden internal token could be used, or computed
@@ -130,7 +136,7 @@ export function withTableData(apiUrl: string) {
         });
       }
     }
-  ]);
+  ];
 }
 ```
 

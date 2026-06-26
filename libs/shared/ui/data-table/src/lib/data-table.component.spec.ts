@@ -706,7 +706,7 @@ const createFixture = async (config: {
   apiUrl: string;
   formatters?: boolean;
 }): Promise<ComponentFixture<DataTableComponent<TestRow>>> => {
-  const providers = [...withTableColumns<TestRow>(config.columns), ...withTableData<TestRow>(config.apiUrl)];
+  const providers = [withTableColumns<TestRow>(config.columns), ...withTableData<TestRow>(config.apiUrl)];
 
   if (config.formatters) {
     providers.push(...withDataFormatters());

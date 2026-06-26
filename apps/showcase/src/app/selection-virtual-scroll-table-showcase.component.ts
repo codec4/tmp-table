@@ -30,7 +30,7 @@ class SelectionVirtualScrollTableShowcaseStore {
   providers: [
     SelectionVirtualScrollTableShowcaseStore,
     withTableTemplates(),
-    ...withTableColumns<ProductRow>(productColumns),
+    withTableColumns<ProductRow>(productColumns),
     withTableRows<ProductRow>(largeProductRows),
     withTableSelection<ProductRow>(() => inject(SelectionVirtualScrollTableShowcaseStore).selection)
   ],
