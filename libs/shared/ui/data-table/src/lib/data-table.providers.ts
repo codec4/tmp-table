@@ -62,23 +62,6 @@ export const withTableTemplates = (): Provider => ({
   useFactory: () => new Map<string, TemplateRef<unknown>>()
 });
 
-/**
- * @deprecated Use `withDataTable`.
- */
-export const provideDataTable = <T extends Record<string, unknown>>(config: DataTableProviderConfig<T>): Provider[] =>
-  withDataTable(config);
-
-/**
- * @deprecated Use `withTableColumns`.
- */
-export const provideTableColumns = <T extends Record<string, unknown>>(columns: TableColumnSource<T>): Provider[] =>
-  withTableColumns(columns);
-
-/**
- * @deprecated Use `withTableTemplates`.
- */
-export const provideTableTemplates = (): Provider => withTableTemplates();
-
 export const withTableRows = <T extends Record<string, unknown>>(rows: TableSignalSource<T[]>): Provider => ({
   provide: TABLE_DATA,
   useFactory: () => resolveSignal(rows) as Signal<Record<string, unknown>[]>
