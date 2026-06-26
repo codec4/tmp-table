@@ -37,6 +37,7 @@ export type DataTableChildRowContext<T extends Record<string, unknown> = Record<
 export type DataTableVirtualScrollOptions = {
   childRowHeight?: number;
   enabled?: boolean;
+  fillContainer?: boolean;
   height?: string | null;
   initialRows?: number;
   overscanRows?: number;
@@ -47,6 +48,7 @@ export type DataTableVirtualScrollOptions = {
 type NormalizedDataTableVirtualScrollOptions = {
   childRowHeight: number;
   enabled: boolean;
+  fillContainer: boolean;
   height: string | null;
   initialRows: number;
   overscanRows: number;
@@ -56,6 +58,10 @@ type NormalizedDataTableVirtualScrollOptions = {
 
 @Component({
   selector: 'lib-data-table',
+  host: {
+    '[style.display]': '"block"',
+    '[style.height]': 'hostHeight()'
+  },
   imports: [
     DataTableBodyComponent,
     DataTableVirtualScrollControllerDirective,
@@ -67,17 +73,23 @@ type NormalizedDataTableVirtualScrollOptions = {
     @if (isVirtualScrollEnabled()) {
       <div
         class="relative overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"
+        data-testid="table-virtual-shell"
         dataTableVirtualScrollController
         #virtualScrollController="dataTableVirtualScrollController"
+        [class.flex]="fillsVirtualScrollContainer()"
+        [class.flex-col]="fillsVirtualScrollContainer()"
         [dataTableVirtualScrollRows]="virtualRows()"
         [dataTableVirtualScrollInitialRows]="virtualScrollOptions().initialRows"
         [dataTableVirtualScrollOverscanRows]="virtualScrollOptions().overscanRows"
         [dataTableVirtualScrollRowHeight]="virtualScrollOptions().rowHeight"
         [dataTableVirtualScrollChildRowHeight]="virtualScrollOptions().childRowHeight"
         [dataTableVirtualScrollRootMargin]="virtualScrollOptions().rootMargin"
+        [style.height]="virtualScrollShellHeight()"
         (dataTableVirtualScrollRangeChange)="rangeChange.emit($event)"
       >
-        <table class="sticky top-0 z-20 w-full min-w-full table-fixed border-separate border-spacing-0 text-sm">
+        <table
+          class="sticky top-0 z-20 w-full min-w-full shrink-0 table-fixed border-separate border-spacing-0 text-sm"
+        >
           <colgroup>
             @for (column of tableColumns(); track column.key) {
               <col [style.width.%]="columnWidthPercent()" />
@@ -118,7 +130,9 @@ type NormalizedDataTableVirtualScrollOptions = {
             class="relative overflow-auto"
             data-testid="table-scroll-root"
             dataTableVirtualScrollViewport
-            [style.max-height]="virtualScrollOptions().height"
+            [class.min-h-0]="fillsVirtualScrollContainer()"
+            [class.flex-1]="fillsVirtualScrollContainer()"
+            [style.max-height]="virtualScrollBodyMaxHeight()"
             [style.min-height]="virtualScrollBodyMinHeight()"
             style="overflow-anchor: none"
           >
@@ -214,6 +228,7 @@ export class DataTableComponent<T extends Record<string, unknown>> {
   readonly columns = input<ColumnDef<T>[] | null>(null);
   readonly loading = input<boolean | null>(null);
   readonly virtualScroll = input<boolean | DataTableVirtualScrollOptions>(false);
+  readonly fillContainer = input(false);
   readonly height = input<string | null>(null);
   readonly initialRows = input(DEFAULT_VIRTUAL_SCROLL_INITIAL_ROWS);
   readonly overscanRows = input(DEFAULT_VIRTUAL_SCROLL_OVERSCAN_ROWS);
@@ -227,6 +242,7 @@ export class DataTableComponent<T extends Record<string, unknown>> {
   readonly virtualScrollOptions = computed(() =>
     normalizeVirtualScrollOptions(this.virtualScroll(), {
       childRowHeight: this.childRowHeight(),
+      fillContainer: this.fillContainer(),
       height: this.height(),
       initialRows: this.initialRows(),
       overscanRows: this.overscanRows(),
@@ -276,7 +292,27 @@ export class DataTableComponent<T extends Record<string, unknown>> {
     return this.rows().slice(range.start, range.end);
   }
 
+  fillsVirtualScrollContainer(): boolean {
+    return this.virtualScrollOptions().fillContainer;
+  }
+
+  hostHeight(): string | null {
+    return this.isVirtualScrollEnabled() && this.fillsVirtualScrollContainer() ? '100%' : null;
+  }
+
+  virtualScrollShellHeight(): string | null {
+    return this.fillsVirtualScrollContainer() ? '100%' : null;
+  }
+
+  virtualScrollBodyMaxHeight(): string | null {
+    return this.fillsVirtualScrollContainer() ? null : this.virtualScrollOptions().height;
+  }
+
   virtualScrollBodyMinHeight(): string | null {
+    if (this.fillsVirtualScrollContainer()) {
+      return null;
+    }
+
     return this.isLoading() && !this.rows().length ? this.virtualScrollOptions().height : null;
   }
 
@@ -307,6 +343,7 @@ const normalizeVirtualScrollOptions = (
   return {
     childRowHeight: options.childRowHeight ?? fallback.childRowHeight,
     enabled,
+    fillContainer: options.fillContainer ?? fallback.fillContainer,
     height: options.height ?? fallback.height ?? '28rem',
     initialRows: options.initialRows ?? fallback.initialRows,
     overscanRows: options.overscanRows ?? fallback.overscanRows,

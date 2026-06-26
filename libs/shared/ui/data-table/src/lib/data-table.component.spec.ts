@@ -94,6 +94,28 @@ describe('data table components', () => {
     expect(fixture.nativeElement.textContent).not.toContain('No results available');
   });
 
+  it('fills the parent container when virtual scroll fill mode is enabled', async () => {
+    await TestBed.configureTestingModule({
+      imports: [VirtualScrollFillContainerHostComponent]
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(VirtualScrollFillContainerHostComponent);
+    fixture.detectChanges();
+
+    const tableHost = (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>('lib-data-table');
+    const shell = virtualScrollShellFor(fixture);
+    const scrollRoot = scrollRootFor(fixture);
+
+    expect(tableHost?.style.height).toBe('100%');
+    expect(shell.style.height).toBe('100%');
+    expect(shell.classList.contains('flex')).toBe(true);
+    expect(shell.classList.contains('flex-col')).toBe(true);
+    expect(scrollRoot.classList.contains('flex-1')).toBe(true);
+    expect(scrollRoot.classList.contains('min-h-0')).toBe(true);
+    expect(scrollRoot.style.maxHeight).toBe('');
+    expect(scrollRoot.style.minHeight).toBe('');
+  });
+
   it('renders a custom template with row, value, and column context', async () => {
     await TestBed.configureTestingModule({
       imports: [DataTableTemplateHostComponent]
@@ -400,6 +422,25 @@ class VirtualScrollInitialLoadingHostComponent {
 }
 
 @Component({
+  imports: [DataTableComponent],
+  template: `
+    <div style="height: 30rem">
+      <lib-data-table
+        [columns]="columns"
+        [data]="rows"
+        [fillContainer]="true"
+        [virtualScroll]="true"
+        [rowHeight]="20"
+      />
+    </div>
+  `
+})
+class VirtualScrollFillContainerHostComponent {
+  readonly columns: ColumnDef<TestRow>[] = [{ key: 'name', header: 'Name' }];
+  readonly rows: TestRow[] = createRows(20);
+}
+
+@Component({
   imports: [DataTableComponent, DataTableTemplateDirective],
   providers: [provideTableTemplates()],
   template: `
@@ -533,6 +574,18 @@ const virtualScrollSpaceFor = (fixture: ComponentFixture<unknown>): HTMLElement 
   }
 
   return scrollSpace;
+};
+
+const virtualScrollShellFor = (fixture: ComponentFixture<unknown>): HTMLElement => {
+  const shell = (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>(
+    '[data-testid="table-virtual-shell"]'
+  );
+
+  if (!shell) {
+    throw new Error('Expected virtual table shell to be rendered.');
+  }
+
+  return shell;
 };
 
 const virtualBodyFor = (fixture: ComponentFixture<unknown>): HTMLElement => {

@@ -22,16 +22,18 @@ Use the virtualized table component when the row set is large:
   imports: [DataTableComponent],
   providers: [...provideTableColumns(columns), withTableRows(rows)],
   template: `
-    <lib-data-table
-      [virtualScroll]="true"
-      height="28rem"
-      [initialRows]="25"
-      [overscanRows]="25"
-      [rowHeight]="48"
-      [childRowHeight]="57"
-      [childRowWhen]="hasDetailRow"
-      childRowTemplateKey="details"
-    />
+    <div style="height: 32rem">
+      <lib-data-table
+        [fillContainer]="true"
+        [virtualScroll]="true"
+        [initialRows]="25"
+        [overscanRows]="25"
+        [rowHeight]="48"
+        [childRowHeight]="57"
+        [childRowWhen]="hasDetailRow"
+        childRowTemplateKey="details"
+      />
+    </div>
   `
 })
 export class VirtualProductsTable {
@@ -47,6 +49,10 @@ row is rendered directly after its parent, so virtual scrolling keeps each paren
 `childRowWhen` when only some parent rows have child row content. `rowHeight` and `childRowHeight` are initial estimates
 for rows that have not been rendered yet; the component measures visible parent and child rows and uses those
 measurements for subsequent scroll math.
+
+By default, `height` sets the virtual body viewport height. Use `[fillContainer]="true"` when the table should fill the
+height of its parent container instead; in that mode the table shell is `100%` height and the body scroll viewport
+flexes under the sticky header.
 
 Use `(rangeChange)` to connect virtual scrolling to a server-paged data source. The event reports the zero-based parent
 row range currently requested by the virtual window, which can be translated to `page` and `pageSize` requests while the

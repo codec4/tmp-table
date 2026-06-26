@@ -41,7 +41,9 @@ import { ProductRow, productColumns, productRows } from './showcase-data';
         </span>
       </ng-template>
 
-      <lib-data-table [virtualScroll]="true" [initialRows]="24" [overscanRows]="24" height="26rem" />
+      <div class="h-[30rem]">
+        <lib-data-table [fillContainer]="true" [virtualScroll]="true" [initialRows]="24" [overscanRows]="24" />
+      </div>
     </section>
   `
 })

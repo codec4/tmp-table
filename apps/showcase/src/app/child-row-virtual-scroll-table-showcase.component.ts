@@ -53,14 +53,16 @@ const hasProductChildRow = (row: ProductRow): boolean => row.id % 3 !== 0;
         </div>
       </ng-template>
 
-      <lib-data-table
-        [virtualScroll]="true"
-        [initialRows]="16"
-        [overscanRows]="16"
-        [childRowWhen]="hasChildRow"
-        childRowTemplateKey="productDetail"
-        height="28rem"
-      />
+      <div class="h-[32rem]">
+        <lib-data-table
+          [fillContainer]="true"
+          [virtualScroll]="true"
+          [initialRows]="16"
+          [overscanRows]="16"
+          [childRowWhen]="hasChildRow"
+          childRowTemplateKey="productDetail"
+        />
+      </div>
     </section>
   `
 })

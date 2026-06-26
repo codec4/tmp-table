@@ -72,13 +72,15 @@ class ContractVirtualScrollTableShowcaseStore extends MockUsersVirtualTableStore
         </span>
       </ng-template>
 
-      <lib-data-table
-        [virtualScroll]="true"
-        [initialRows]="24"
-        [overscanRows]="24"
-        height="26rem"
-        (rangeChange)="store.loadVisibleRange($event)"
-      />
+      <div class="h-[30rem]">
+        <lib-data-table
+          [fillContainer]="true"
+          [virtualScroll]="true"
+          [initialRows]="24"
+          [overscanRows]="24"
+          (rangeChange)="store.loadVisibleRange($event)"
+        />
+      </div>
     </section>
   `
 })

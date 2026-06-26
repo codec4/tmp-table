@@ -88,15 +88,17 @@ class ContractChildRowVirtualScrollTableShowcaseStore extends MockUsersVirtualTa
         </div>
       </ng-template>
 
-      <lib-data-table
-        [virtualScroll]="true"
-        [initialRows]="16"
-        [overscanRows]="16"
-        [childRowWhen]="hasChildRow"
-        childRowTemplateKey="userProfile"
-        height="28rem"
-        (rangeChange)="store.loadVisibleRange($event)"
-      />
+      <div class="h-[32rem]">
+        <lib-data-table
+          [fillContainer]="true"
+          [virtualScroll]="true"
+          [initialRows]="16"
+          [overscanRows]="16"
+          [childRowWhen]="hasChildRow"
+          childRowTemplateKey="userProfile"
+          (rangeChange)="store.loadVisibleRange($event)"
+        />
+      </div>
     </section>
   `
 })
