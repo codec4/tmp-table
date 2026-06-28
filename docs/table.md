@@ -148,7 +148,7 @@ export function withTableData(apiUrl: string) {
 Unchanged pattern: it registers the user's template to the `Map`.
 
 ```typescript
-import { Directive, Input, TemplateRef, inject, OnInit, OnDestroy } from '@angular/core';
+import { Directive, TemplateRef, inject, input, OnInit, OnDestroy } from '@angular/core';
 import { TABLE_TEMPLATES } from './table.tokens';
 
 @Directive({
@@ -156,17 +156,19 @@ import { TABLE_TEMPLATES } from './table.tokens';
   standalone: true
 })
 export class TableTemplateDirective implements OnInit, OnDestroy {
-  @Input('tableTemplate') templateKey!: string;
+  readonly tableTemplate = input<string>();
 
   private templateRef = inject(TemplateRef);
   private templatesRegistry = inject(TABLE_TEMPLATES);
 
   ngOnInit() {
-    if (this.templateKey) this.templatesRegistry.set(this.templateKey, this.templateRef);
+    const key = this.tableTemplate();
+    if (key) this.templatesRegistry.set(key, this.templateRef);
   }
 
   ngOnDestroy() {
-    if (this.templateKey) this.templatesRegistry.delete(this.templateKey);
+    const key = this.tableTemplate();
+    if (key) this.templatesRegistry.delete(key);
   }
 }
 ```

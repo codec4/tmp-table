@@ -43,27 +43,13 @@ export class DataTableVirtualScrollControllerDirective implements OnDestroy {
   #scrollRestorationTimer?: ReturnType<typeof setTimeout>;
   #emittedRange: VirtualRowsRange | null = null;
 
-  readonly rows = input<VirtualScrollRow[]>([], {
-    alias: 'dataTableVirtualScrollRows'
-  });
-  readonly initialRows = input(DEFAULT_VIRTUAL_SCROLL_INITIAL_ROWS, {
-    alias: 'dataTableVirtualScrollInitialRows'
-  });
-  readonly overscanRows = input(DEFAULT_VIRTUAL_SCROLL_OVERSCAN_ROWS, {
-    alias: 'dataTableVirtualScrollOverscanRows'
-  });
-  readonly rowHeight = input(DEFAULT_VIRTUAL_SCROLL_ROW_HEIGHT, {
-    alias: 'dataTableVirtualScrollRowHeight'
-  });
-  readonly childRowHeight = input(DEFAULT_VIRTUAL_SCROLL_CHILD_ROW_HEIGHT, {
-    alias: 'dataTableVirtualScrollChildRowHeight'
-  });
-  readonly rootMargin = input('240px 0px', {
-    alias: 'dataTableVirtualScrollRootMargin'
-  });
-  readonly rangeChange = output<VirtualRowsRange>({
-    alias: 'dataTableVirtualScrollRangeChange'
-  });
+  readonly rows = input<VirtualScrollRow[]>([]);
+  readonly initialRows = input(DEFAULT_VIRTUAL_SCROLL_INITIAL_ROWS);
+  readonly overscanRows = input(DEFAULT_VIRTUAL_SCROLL_OVERSCAN_ROWS);
+  readonly rowHeight = input(DEFAULT_VIRTUAL_SCROLL_ROW_HEIGHT);
+  readonly childRowHeight = input(DEFAULT_VIRTUAL_SCROLL_CHILD_ROW_HEIGHT);
+  readonly rootMargin = input('240px 0px');
+  readonly rangeChange = output<VirtualRowsRange>();
 
   readonly scrollRootElement = signal<HTMLElement | null>(null);
 
