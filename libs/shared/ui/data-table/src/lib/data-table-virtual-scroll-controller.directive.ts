@@ -1,4 +1,14 @@
-import { ChangeDetectorRef, Directive, computed, effect, inject, input, output, signal } from '@angular/core';
+import {
+  ChangeDetectorRef,
+  Directive,
+  OnDestroy,
+  computed,
+  effect,
+  inject,
+  input,
+  output,
+  signal
+} from '@angular/core';
 import {
   DEFAULT_VIRTUAL_SCROLL_CHILD_ROW_HEIGHT,
   DEFAULT_VIRTUAL_SCROLL_INITIAL_ROWS,
@@ -21,7 +31,7 @@ import type {
   exportAs: 'dataTableVirtualScrollController',
   selector: '[dataTableVirtualScrollController]'
 })
-export class DataTableVirtualScrollControllerDirective {
+export class DataTableVirtualScrollControllerDirective implements OnDestroy {
   readonly #changeDetectorRef = inject(ChangeDetectorRef);
   readonly #scrollTop = signal(0);
   readonly #viewportHeight = signal(0);
@@ -30,6 +40,7 @@ export class DataTableVirtualScrollControllerDirective {
   readonly #isPointerActive = signal(false);
   readonly #isScrolling = signal(false);
   #pendingMeasurements: VirtualRowMeasurement[] = [];
+  #scrollRestorationTimer?: ReturnType<typeof setTimeout>;
   #emittedRange: VirtualRowsRange | null = null;
 
   readonly rows = input<VirtualScrollRow[]>([], {
@@ -223,15 +234,57 @@ export class DataTableVirtualScrollControllerDirective {
     }
 
     if (scrollRoot) {
-      scrollRoot.scrollTop = calculatePreservedScrollTop({
-        nextTotalHeight: this.totalHeight(),
-        previousScrollTop,
-        previousTotalHeight,
-        viewportHeight: scrollRoot.clientHeight
-      });
+      this.#restoreScrollTopAfterRender(
+        scrollRoot,
+        calculatePreservedScrollTop({
+          nextTotalHeight: this.totalHeight(),
+          previousScrollTop,
+          previousTotalHeight,
+          viewportHeight: scrollRoot.clientHeight
+        }),
+        previousScrollTop
+      );
     }
 
     this.syncViewportFromRoot();
     this.#changeDetectorRef.markForCheck();
+  }
+
+  #restoreScrollTopAfterRender(scrollRoot: HTMLElement, targetScrollTop: number, previousScrollTop: number): void {
+    if (this.#scrollRestorationTimer !== undefined) {
+      clearTimeout(this.#scrollRestorationTimer);
+    }
+
+    scrollRoot.scrollTop = targetScrollTop;
+    const immediateScrollTop = scrollRoot.scrollTop;
+
+    this.#scrollRestorationTimer = setTimeout(() => {
+      this.#scrollRestorationTimer = undefined;
+
+      if (this.scrollRootElement() !== scrollRoot) {
+        return;
+      }
+
+      const currentScrollTop = scrollRoot.scrollTop;
+      const userMovedScroll =
+        Math.abs(currentScrollTop - immediateScrollTop) > 1 &&
+        Math.abs(currentScrollTop - previousScrollTop) > 1 &&
+        Math.abs(currentScrollTop - targetScrollTop) > 1;
+
+      if (userMovedScroll) {
+        return;
+      }
+
+      scrollRoot.scrollTop = targetScrollTop;
+      this.syncViewportFromRoot();
+      this.#changeDetectorRef.markForCheck();
+    }, 0);
+  }
+
+  ngOnDestroy(): void {
+    if (this.#scrollRestorationTimer !== undefined) {
+      clearTimeout(this.#scrollRestorationTimer);
+      this.#scrollRestorationTimer = undefined;
+    }
   }
 }

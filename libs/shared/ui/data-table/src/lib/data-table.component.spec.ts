@@ -414,6 +414,56 @@ describe('data table components', () => {
     }
   });
 
+  it('reapplies the preserved bottom scroll position after measured height increases on thumb release', async () => {
+    const restoreIntersectionObserver = installMockIntersectionObserver();
+    const getBoundingClientRect = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect');
+
+    getBoundingClientRect.mockImplementation(function (this: HTMLElement) {
+      return this.dataset['virtualRowKey']?.startsWith('parent:') ? rectWithHeight(30) : rectWithHeight(0);
+    });
+
+    try {
+      await TestBed.configureTestingModule({
+        imports: [VirtualScrollHostComponent]
+      }).compileComponents();
+
+      const fixture = TestBed.createComponent(VirtualScrollHostComponent);
+      await render(fixture);
+
+      const scrollRoot = scrollRootFor(fixture);
+      setClientHeight(scrollRoot, 40);
+
+      let maxScrollTop = 360;
+      installClampedScrollTop(scrollRoot, () => maxScrollTop);
+
+      scrollRoot.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+      scrollRoot.scrollTop = maxScrollTop;
+      scrollRoot.dispatchEvent(new Event('scroll'));
+      fixture.detectChanges();
+
+      await new Promise(resolve => setTimeout(resolve, 260));
+      fixture.detectChanges();
+
+      expect(virtualScrollSpaceFor(fixture).style.height).toBe('400px');
+      expect(scrollRoot.scrollTop).toBe(360);
+
+      document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+      fixture.detectChanges();
+
+      maxScrollTop = Number.parseFloat(virtualScrollSpaceFor(fixture).style.height) - scrollRoot.clientHeight;
+      expect(maxScrollTop).toBeGreaterThan(360);
+      expect(scrollRoot.scrollTop).toBe(360);
+
+      await new Promise(resolve => setTimeout(resolve, 0));
+      fixture.detectChanges();
+
+      expect(scrollRoot.scrollTop).toBeCloseTo(maxScrollTop, 1);
+    } finally {
+      getBoundingClientRect.mockRestore();
+      restoreIntersectionObserver();
+    }
+  });
+
   it('bottom-aligns the final measured child-row window without changing scroll height while dragging', async () => {
     const restoreIntersectionObserver = installMockIntersectionObserver();
     const getBoundingClientRect = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect');
@@ -879,6 +929,18 @@ const setClientHeight = (element: HTMLElement, clientHeight: number): void => {
   Object.defineProperty(element, 'clientHeight', {
     configurable: true,
     value: clientHeight
+  });
+};
+
+const installClampedScrollTop = (element: HTMLElement, maxScrollTop: () => number): void => {
+  let scrollTop = element.scrollTop;
+
+  Object.defineProperty(element, 'scrollTop', {
+    configurable: true,
+    get: () => scrollTop,
+    set: value => {
+      scrollTop = Math.min(Math.max(value, 0), maxScrollTop());
+    }
   });
 };
 
