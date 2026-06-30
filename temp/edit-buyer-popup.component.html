@@ -1,0 +1,307 @@
+@let id = form.get('id')?.value;
+<form [formGroup]="form" (submit)="submit()" name="edit-buyer">
+  <lp-dialog-header>
+    @let loading = loading$ | async;
+    Edit Buyer {{ id }}
+    <button
+      *isGrantedEdit="'main.buyer'"
+      [disabled]="!form.dirty || form.invalid || loading"
+      mat-flat-button
+      type="submit"
+      actions
+    >
+      Save
+    </button>
+  </lp-dialog-header>
+
+  <mat-dialog-content [ngClass]="{ blur: (loadingEntity$ | async) !== false }">
+    <mat-card>
+      <mat-card-content>
+        <mat-accordion>
+          <mat-expansion-panel [expanded]="true">
+            <mat-expansion-panel-header>
+              <mat-panel-title>General</mat-panel-title>
+            </mat-expansion-panel-header>
+            <div class="row gy-4">
+              <div class="col-12 col-lg-3" *isGrantedRead="'main.buyer.companyName'">
+                <mat-form-field>
+                  <mat-label>Company</mat-label>
+                  <input
+                    id="companyName"
+                    placeholder="Company"
+                    matInput
+                    formControlName="companyName"
+                    name="companyName"
+                    isGrantedEdit="main.buyer.companyName"
+                  />
+                  <mat-error></mat-error>
+                </mat-form-field>
+              </div>
+              <div class="col-12 col-lg-3" *isGrantedRead="'main.buyer.firstName'">
+                <mat-form-field>
+                  <mat-label>First Name</mat-label>
+                  <input
+                    id="firstName"
+                    matInput
+                    formControlName="firstName"
+                    isGrantedEdit="main.buyer.firstName"
+                    name="firstName"
+                    placeholder="First Name"
+                  />
+                  <mat-error></mat-error>
+                </mat-form-field>
+              </div>
+              <div class="col-12 col-lg-3" *isGrantedRead="'main.buyer.lastName'">
+                <mat-form-field>
+                  <mat-label>Last Name</mat-label>
+                  <input
+                    id="lastName"
+                    matInput
+                    formControlName="lastName"
+                    isGrantedEdit="main.buyer.lastName"
+                    name="lastName"
+                    placeholder="Last Name"
+                  />
+                  <mat-error></mat-error>
+                </mat-form-field>
+              </div>
+              <div class="col-12 col-lg-3" *isGrantedRead="'main.buyer.phone'">
+                <mat-form-field>
+                  <mat-label>Phone</mat-label>
+                  <input
+                    id="phone"
+                    matInput
+                    type="text"
+                    isGrantedEdit="main.buyer.phone"
+                    formControlName="phone"
+                    name="phone"
+                    placeholder="Phone"
+                  />
+                  <mat-error></mat-error>
+                </mat-form-field>
+              </div>
+              <div class="col-12 col-lg-3" *isGrantedRead="'main.buyer.email'">
+                <mat-form-field>
+                  <mat-label>Email</mat-label>
+                  <input
+                    id="email"
+                    matInput
+                    type="text"
+                    placeholder="Email"
+                    formControlName="email"
+                    name="email"
+                    placeholder="Email"
+                    isGrantedEdit="main.buyer.email"
+                  />
+                  <mat-error></mat-error>
+                </mat-form-field>
+              </div>
+              <div class="col-12 col-lg-3" *isGrantedRead="'main.buyer.website'">
+                <mat-form-field>
+                  <mat-label>Website</mat-label>
+                  <input
+                    id="website"
+                    placeholder="Website"
+                    isGrantedEdit="main.buyer.email"
+                    matInput
+                    type="url"
+                    formControlName="website"
+                    name="website"
+                  />
+                  <mat-error></mat-error>
+                </mat-form-field>
+              </div>
+              <div class="col-12 col-lg-3" *isGrantedRead="'main.buyer.imType'">
+                <mlp-select
+                  placeholder="IM Type"
+                  ldDictionaryEntity="im"
+                  formControlName="imTypeId"
+                  isGrantedEdit="main.buyer.imType"
+                ></mlp-select>
+              </div>
+              <div class="col-12 col-lg-3" *isGrantedRead="'main.buyer.imID'">
+                <mat-form-field>
+                  <mat-label>IM Type</mat-label>
+                  <input
+                    id="imId"
+                    matInput
+                    formControlName="imId"
+                    isGrantedEdit="main.buyer.imID"
+                    name="imId"
+                    placeholder="IM ID"
+                  />
+                  <mat-error></mat-error>
+                </mat-form-field>
+              </div>
+              <div class="col-12 col-lg-3" *isGrantedRead="'main.buyer.trusted'">
+                <mlp-select
+                  placeholder="Trusted/Not Trusted"
+                  formControlName="trusted"
+                  isGrantedEdit="main.buyer.trusted"
+                ></mlp-select>
+              </div>
+              <div class="col-12 col-lg-3" *isGrantedRead="'main.buyer.stopPostingConditions'">
+                <mlp-select
+                  [multiple]="true"
+                  placeholder="Stop Posting Condition"
+                  ldDictionaryEntity="stopPostingConditions"
+                  formControlName="stopPostingConditions"
+                  isGrantedEdit="main.buyer.stopPostingConditions"
+                ></mlp-select>
+              </div>
+            </div>
+          </mat-expansion-panel>
+
+          <mat-expansion-panel *isGrantedRead="'main.buyer.timezone'">
+            <mat-expansion-panel-header>
+              <mat-panel-title>Timezone</mat-panel-title>
+            </mat-expansion-panel-header>
+            <div class="row gy-4">
+              <div class="col-12 col-lg-3" *isGrantedRead="'main.buyer.timezone'">
+                <mlp-select
+                  label="Timezone"
+                  ldDictionaryEntity="timezones"
+                  formControlName="timezone"
+                  isGrantedEdit="main.buyer.timezone"
+                ></mlp-select>
+              </div>
+            </div>
+          </mat-expansion-panel>
+
+          <mat-expansion-panel *isGrantedRead="'main.buyer.address'">
+            <mat-expansion-panel-header>
+              <mat-panel-title>Address</mat-panel-title>
+            </mat-expansion-panel-header>
+            <div class="row gy-4" formGroupName="address">
+              <div class="col-12">
+                <lsdf-address [form]="form" [permissions]="'main.buyer.address'"></lsdf-address>
+              </div>
+            </div>
+          </mat-expansion-panel>
+
+          <mat-expansion-panel
+            *isGranted="['main.buyer.verticalId', 'main.buyer.type', 'main.buyer.manager', 'main.buyer.status']"
+          >
+            <mat-expansion-panel-header>
+              <mat-panel-title>Buyer Account Details</mat-panel-title>
+            </mat-expansion-panel-header>
+            <div class="row gy-4">
+              <div class="col-12 col-lg-3" *isGrantedRead="'main.buyer.vertical'">
+                <mlp-select
+                  formControlName="verticalId"
+                  ldDictionaryEntity="buyerVerticals"
+                  placeholder="Buyer Vertical"
+                  isGrantedEdit="main.buyer.vertical"
+                ></mlp-select>
+              </div>
+              <div class="col-12 col-lg-3" *isGrantedRead="'main.buyer.type'">
+                <mlp-select
+                  placeholder="Buyer Type"
+                  ldDictionaryEntity="buyerTypes"
+                  formControlName="typeId"
+                  isGrantedEdit="main.buyer.type"
+                ></mlp-select>
+              </div>
+              <ng-container *isGrantedRead="'main.buyer.manager'" formArrayName="accountManagers">
+                @for (manager of accountManagers.controls; track manager; let i = $index; let last = $last) {
+                  <div class="col-12 col-lg-3">
+                    <mlp-select
+                      id="uid"
+                      [placeholder]="'Account Manager ' + (i + 1)"
+                      [formControlName]="i.toString()"
+                      [clearable]="true"
+                      lsuManagers
+                      isGrantedEdit="main.buyer.manager"
+                    ></mlp-select>
+                  </div>
+                }
+              </ng-container>
+              <div class="col-12 col-lg-3" *isGrantedRead="'main.buyer.status'">
+                <mlp-select
+                  placeholder="Account Status"
+                  ldStatusesEntity="market"
+                  formControlName="statusId"
+                  isGrantedEdit="main.buyer.status"
+                ></mlp-select>
+              </div>
+            </div>
+          </mat-expansion-panel>
+
+          <mat-expansion-panel *isGrantedRead="'main.buyer.minAllowedTokenPrice'">
+            <mat-expansion-panel-header>
+              <mat-panel-title>Token Settings</mat-panel-title>
+            </mat-expansion-panel-header>
+            <div class="row gy-4">
+              <div class="col-12 col-lg-3">
+                <mat-form-field>
+                  <mat-label>Min Allowed Token Price</mat-label>
+                  <input
+                    id="minAllowedTokenPrice"
+                    placeholder="Min Allowed Token Price"
+                    type="number"
+                    matInput
+                    formControlName="minAllowedTokenPrice"
+                    name="minAllowedTokenPrice"
+                    isGrantedEdit="main.buyer.minAllowedTokenPrice"
+                  />
+                  <mat-error></mat-error>
+                </mat-form-field>
+              </div>
+            </div>
+          </mat-expansion-panel>
+
+          <mat-expansion-panel
+            *isGrantedRead="[
+              'main.buyer.tribal',
+              'main.buyer.tribal.affiliation',
+              'main.buyer.tribal.type',
+              'main.buyer.bank.chartered'
+            ]"
+          >
+            <mat-expansion-panel-header>
+              <mat-panel-title>Info</mat-panel-title>
+            </mat-expansion-panel-header>
+            <div class="row gy-4">
+              <div class="col-12 col-lg-3" *isGrantedRead="'main.buyer.tribal'">
+                <mat-checkbox formControlName="tribal" isGrantedEdit="main.buyer.tribal">Tribal</mat-checkbox>
+              </div>
+              <div class="col-12 col-lg-3" *isGrantedRead="'main.buyer.tribal.affiliation'">
+                @let disabled =
+                  form.get('tribal')?.value !== true && form.get('tribalTypeId')?.value !== tribalLicenseId;
+                <mat-form-field>
+                  <mat-label>Tribal Affiliation</mat-label>
+                  <input
+                    id="tribalAffiliation"
+                    [isGrantedEditDisabled]="disabled"
+                    placeholder="Tribal Affiliation"
+                    formControlName="tribalAffiliation"
+                    name="tribalAffiliation"
+                    matInput
+                    isGrantedEdit="main.buyer.tribal.affiliation"
+                  />
+                  <mat-error></mat-error>
+                </mat-form-field>
+              </div>
+              <div class="col-12 col-lg-3" *isGrantedRead="'main.buyer.tribal.type'">
+                <mlp-select
+                  placeholder="Tribal Type"
+                  ldDictionaryEntity="tribalTypes"
+                  formControlName="tribalTypeId"
+                  isGrantedEdit="main.buyer.tribal.type"
+                ></mlp-select>
+              </div>
+              <div class="col-12 col-lg-3" *isGrantedRead="'main.buyer.bank.chartered'">
+                <mlp-select
+                  placeholder="Bank Chartered"
+                  ldDictionaryEntity="bankCharteredTypes"
+                  formControlName="bankCharteredTypeId"
+                  isGrantedEdit="main.buyer.bank.chartered"
+                ></mlp-select>
+              </div>
+            </div>
+          </mat-expansion-panel>
+        </mat-accordion>
+      </mat-card-content>
+    </mat-card>
+  </mat-dialog-content>
+</form>
