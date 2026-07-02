@@ -1,29 +1,15 @@
 <article
-  [class]="toastClass(toast())"
+  [class]="toast() | hotToastItemClass"
   [ngStyle]="toast().style"
   [attr.role]="toast().ariaProps.role"
   [attr.aria-live]="toast().ariaProps.ariaLive"
   [attr.aria-atomic]="toast().ariaProps.ariaAtomic"
 >
   <div class="flex gap-x-3 p-4">
-    <lib-hot-toast-icon [toast]="toast()" [templateContext]="templateContext(toast())" />
+    <lib-hot-toast-icon [toast]="toast()" />
 
     <div class="min-w-0 grow">
-      @if (messageTemplate(toast()); as template) {
-        <ng-container *ngTemplateOutlet="template; context: templateContext(toast())" />
-      } @else {
-        <p class="text-sm font-medium text-slate-900">{{ messageText(toast()) }}</p>
-      }
-
-      @if (toast().description) {
-        @if (descriptionTemplate(toast()); as template) {
-          <div class="mt-1 text-sm text-slate-600">
-            <ng-container *ngTemplateOutlet="template; context: templateContext(toast())" />
-          </div>
-        } @else {
-          <p class="mt-1 text-sm text-slate-600">{{ descriptionText(toast()) }}</p>
-        }
-      }
+      <lib-hot-toast-content [toast]="toast()" />
     </div>
 
     @if (toast().action || toast().dismissible) {

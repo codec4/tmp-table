@@ -1,0 +1,19 @@
+@let messageView = message();
+
+@if (messageView.template; as template) {
+  <ng-container *ngTemplateOutlet="template; context: templateContext()" />
+} @else {
+  <p class="text-sm font-medium text-slate-900">{{ messageView.text }}</p>
+}
+
+@let descriptionView = description();
+
+@if (descriptionView) {
+  @if (descriptionView.template; as template) {
+    <div class="mt-1 text-sm text-slate-600">
+      <ng-container *ngTemplateOutlet="template; context: templateContext()" />
+    </div>
+  } @else {
+    <p class="mt-1 text-sm text-slate-600">{{ descriptionView.text }}</p>
+  }
+}

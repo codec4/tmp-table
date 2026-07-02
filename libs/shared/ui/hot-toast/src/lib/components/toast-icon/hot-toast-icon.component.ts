@@ -1,5 +1,7 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, TemplateRef, computed, input } from '@angular/core';
+import { createHotToastTemplateContext } from '../../hot-toast-renderable';
+import { injectHotToast } from '../../hot-toast.service';
 import { HotToast, HotToastRenderable, HotToastTemplateContext, HotToastType } from '../../hot-toast.types';
 
 type HotToastIconPath = {
@@ -100,8 +102,9 @@ const HOT_TOAST_TYPE_ICON: Partial<Record<HotToastType, HotToastIconGraphic>> = 
   templateUrl: './hot-toast-icon.component.html'
 })
 export class HotToastIconComponent {
+  readonly #toastService = injectHotToast();
+
   readonly toast = input.required<HotToast>();
-  readonly templateContext = input.required<HotToastTemplateContext>();
 
   readonly color = computed(() => this.toast().iconTheme?.primary ?? HOT_TOAST_ICON_COLOR[this.toast().type]);
   readonly iconText = computed(() => {
@@ -110,6 +113,9 @@ export class HotToastIconComponent {
     return typeof icon === 'string' && icon ? icon : null;
   });
   readonly iconTemplate = computed(() => this.#templateOrNull(this.toast().icon));
+  readonly templateContext = computed(() =>
+    createHotToastTemplateContext(this.toast(), toastId => this.#toastService.dismiss(toastId))
+  );
   readonly typeIcon = computed(() => HOT_TOAST_TYPE_ICON[this.toast().type] ?? null);
   readonly visible = computed(
     () => this.iconTemplate() !== null || this.iconText() !== null || this.typeIcon() !== null
