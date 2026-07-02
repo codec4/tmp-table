@@ -14,6 +14,15 @@ const HOT_TOAST_POSITION_CLASS: Record<HotToastPosition, string> = {
   'bottom-right': 'bottom-4 right-4 items-end'
 };
 
+export const createHotToastGroupsByPosition = (): HotToastGroupsByPosition => ({
+  'top-left': [],
+  'top-center': [],
+  'top-right': [],
+  'bottom-left': [],
+  'bottom-center': [],
+  'bottom-right': []
+});
+
 @Pipe({
   name: 'hotToastPlacementClass',
   standalone: true

@@ -4,7 +4,8 @@ import { HotToastItemComponent } from '../toast-item/hot-toast-item.component';
 import {
   HotToastGroupsByPosition,
   HotToastPlacementClassPipe,
-  HotToastPositionedToastsPipe
+  HotToastPositionedToastsPipe,
+  createHotToastGroupsByPosition
 } from '../../pipes/hot-toast-placement.pipe';
 import { HotToastService } from '../../hot-toast.service';
 import {
@@ -38,8 +39,8 @@ export class HotToasterComponent implements OnDestroy {
   readonly toastOptions = input<HotToastDefaultOptions>({});
 
   readonly positions = HOT_TOAST_POSITIONS;
-  readonly toastGroups = computed(() => {
-    const groups = this.#emptyGroups();
+  readonly toastGroups = computed<HotToastGroupsByPosition>(() => {
+    const groups = createHotToastGroupsByPosition();
 
     for (const toast of this.#toasts.toasts()) {
       if (toast.toasterId === this.toasterId()) {
@@ -71,16 +72,5 @@ export class HotToasterComponent implements OnDestroy {
 
   endPause(): void {
     this.#toasts.endPause(this.toasterId());
-  }
-
-  #emptyGroups(): HotToastGroupsByPosition {
-    return {
-      'top-left': [],
-      'top-center': [],
-      'top-right': [],
-      'bottom-left': [],
-      'bottom-center': [],
-      'bottom-right': []
-    };
   }
 }

@@ -1,7 +1,8 @@
 import { Component, inject, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { HotToasterComponent } from './components/toaster/hot-toaster.component';
-import { HotToastService, withHotToast } from './hot-toast.service';
+import { withHotToast } from './hot-toast.config';
+import { HotToastService } from './hot-toast.service';
 import { HotToastSignalState } from './hot-toast.types';
 
 describe('hot toast', () => {
@@ -154,6 +155,33 @@ describe('hot toast', () => {
         type: 'success'
       })
     );
+
+    controller.destroy();
+  });
+
+  it('does not create a toast while a signal source is idle', () => {
+    TestBed.configureTestingModule({});
+    service = TestBed.inject(HotToastService);
+    const state = signal<HotToastSignalState<{ count: number }>>({ status: 'idle' });
+
+    const controller = service.toast.signal(state, {
+      loading: 'Waiting for signal work',
+      success: value => `Synced ${value.count} records`,
+      error: 'Signal failed'
+    });
+
+    expect(service.toasts()).toEqual([]);
+
+    state.set({ status: 'loading' });
+    TestBed.tick();
+
+    expect(service.toasts()).toEqual([
+      expect.objectContaining({
+        id: controller.id,
+        message: 'Waiting for signal work',
+        type: 'loading'
+      })
+    ]);
 
     controller.destroy();
   });

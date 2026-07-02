@@ -6,12 +6,18 @@ import {
   HotToastPromiseMessage,
   HotToastPromiseMessages,
   HotToastPromiseOptions,
+  HotToastOptions,
   HotToastRenderable,
   HotToastSignalController,
   HotToastSignalMessages,
   HotToastSignalOptions,
   HotToastSignalState
 } from './hot-toast.types';
+
+type HotToastAsyncStateType = 'error' | 'loading' | 'success';
+type HotToastAsyncOptions = HotToastOptions & Partial<Record<HotToastAsyncStateType, HotToastOptions>>;
+
+let signalToastIdSequence = 0;
 
 export const createHotToastApi = (store: InstanceType<typeof HotToastStore>, injector: Injector): HotToastApi => {
   const toast = ((message, options = {}) => store.create('blank', message, options)) as HotToastApi;
@@ -35,14 +41,14 @@ const toastPromise = async <T>(
   messages: HotToastPromiseMessages<T>,
   options: HotToastPromiseOptions
 ): Promise<T> => {
-  const toastId = toast.loading(messages.loading, promiseOptionsFor('loading', options));
+  const toastId = toast.loading(messages.loading, toastOptionsFor('loading', options));
 
   try {
     const result = await (typeof value === 'function' ? value() : value);
-    toast.success(resolvePromiseMessage(messages.success, result), promiseOptionsFor('success', options, toastId));
+    toast.success(resolvePromiseMessage(messages.success, result), toastOptionsFor('success', options, toastId));
     return result;
   } catch (error) {
-    toast.error(resolvePromiseErrorMessage(messages.error, error), promiseOptionsFor('error', options, toastId));
+    toast.error(resolvePromiseErrorMessage(messages.error, error), toastOptionsFor('error', options, toastId));
     throw error;
   }
 };
@@ -55,45 +61,18 @@ const toastSignal = <T>(
   options: HotToastSignalOptions
 ): HotToastSignalController => {
   const initialState = source();
-  const toastId = toast.loading(resolveSignalLoadingMessage(messages.loading, initialState), {
-    ...options,
-    ...(options.loading ?? {})
-  });
+  const toastId = options.id ?? nextSignalToastId();
+  syncSignalToast(toast, messages, options, toastId, initialState);
+
   const effectRef = effect(
     () => {
       const state = source();
 
-      switch (state.status) {
-        case 'idle':
-          return;
-        case 'loading':
-          untracked(() =>
-            toast.loading(resolveSignalLoadingMessage(messages.loading, state), {
-              ...options,
-              ...(options.loading ?? {}),
-              id: toastId
-            })
-          );
-          return;
-        case 'success':
-          untracked(() =>
-            toast.success(resolvePromiseMessage(messages.success, state.value), {
-              ...options,
-              ...(options.success ?? {}),
-              id: toastId
-            })
-          );
-          return;
-        case 'error':
-          untracked(() =>
-            toast.error(resolvePromiseErrorMessage(messages.error, state.error), {
-              ...options,
-              ...(options.error ?? {}),
-              id: toastId
-            })
-          );
-          return;
+      if (state === initialState) {
+        return;
       }
+
+      untracked(() => syncSignalToast(toast, messages, options, toastId, state));
     },
     { injector }
   );
@@ -104,15 +83,46 @@ const toastSignal = <T>(
   };
 };
 
-const promiseOptionsFor = (
-  type: 'error' | 'loading' | 'success',
-  options: HotToastPromiseOptions,
+const syncSignalToast = <T>(
+  toast: HotToastApi,
+  messages: HotToastSignalMessages<T>,
+  options: HotToastSignalOptions,
+  toastId: string,
+  state: HotToastSignalState<T>
+): void => {
+  switch (state.status) {
+    case 'idle':
+      return;
+    case 'loading':
+      toast.loading(resolveSignalLoadingMessage(messages.loading, state), toastOptionsFor('loading', options, toastId));
+      return;
+    case 'success':
+      toast.success(resolvePromiseMessage(messages.success, state.value), toastOptionsFor('success', options, toastId));
+      return;
+    case 'error':
+      toast.error(resolvePromiseErrorMessage(messages.error, state.error), toastOptionsFor('error', options, toastId));
+      return;
+  }
+};
+
+const toastOptionsFor = (
+  type: HotToastAsyncStateType,
+  options: HotToastAsyncOptions,
   toastId?: string
-): HotToastPromiseOptions => ({
-  ...options,
-  ...(options[type] ?? {}),
-  id: toastId ?? options.id
-});
+): HotToastOptions => {
+  const { error, loading, success, ...baseOptions } = options;
+
+  return {
+    ...baseOptions,
+    ...((type === 'error' ? error : type === 'loading' ? loading : success) ?? {}),
+    id: toastId ?? options.id
+  };
+};
+
+const nextSignalToastId = (): string => {
+  signalToastIdSequence += 1;
+  return `hot-toast-signal-${signalToastIdSequence}`;
+};
 
 const resolvePromiseMessage = <T>(message: HotToastPromiseMessage<T>, value: T): HotToastRenderable =>
   typeof message === 'function' ? message(value) : message;

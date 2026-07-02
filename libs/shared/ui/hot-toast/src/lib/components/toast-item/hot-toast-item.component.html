@@ -1,5 +1,5 @@
 <article
-  [class]="toast() | hotToastItemClass"
+  class="{{ toast() | hotToastItemClass }}"
   [ngStyle]="toast().style"
   [attr.role]="toast().ariaProps.role"
   [attr.aria-live]="toast().ariaProps.ariaLive"
