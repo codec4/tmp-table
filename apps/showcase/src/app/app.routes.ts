@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { HomePageComponent } from './home-page.component';
-import { ShowcasesPageComponent } from './showcases-page.component';
+import { TablesPageComponent } from './tables-page.component';
+import { ToastPageComponent } from './toast-page.component';
 
 export const appRoutes: Routes = [
   {
@@ -9,9 +10,18 @@ export const appRoutes: Routes = [
     title: 'Table Provider'
   },
   {
+    path: 'tables',
+    component: TablesPageComponent,
+    title: 'Table Showcases'
+  },
+  {
+    path: 'toast',
+    component: ToastPageComponent,
+    title: 'Toast Showcase'
+  },
+  {
     path: 'showcases',
-    component: ShowcasesPageComponent,
-    title: 'Table Provider Showcases'
+    redirectTo: 'tables'
   },
   {
     path: '**',

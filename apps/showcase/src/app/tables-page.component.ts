@@ -4,7 +4,6 @@ import { ContractChildRowVirtualScrollTableShowcaseComponent } from './contract-
 import { ContractSelectionVirtualScrollTableShowcaseComponent } from './contract-selection-virtual-scroll-table-showcase.component';
 import { ContractVirtualScrollTableShowcaseComponent } from './contract-virtual-scroll-table-showcase.component';
 import { FormVirtualScrollTableShowcaseComponent } from './form-virtual-scroll-table-showcase.component';
-import { HotToastShowcaseComponent } from './hot-toast-showcase.component';
 import { LargeVirtualScrollTableShowcaseComponent } from './large-virtual-scroll-table-showcase.component';
 import { PaginationTableShowcaseComponent } from './pagination-table-showcase.component';
 import { SelectionTableShowcaseComponent } from './selection-table-showcase.component';
@@ -16,7 +15,6 @@ import { VirtualScrollTableShowcaseComponent } from './virtual-scroll-table-show
   imports: [
     PaginationTableShowcaseComponent,
     SelectionTableShowcaseComponent,
-    HotToastShowcaseComponent,
     ContractVirtualScrollTableShowcaseComponent,
     ContractSelectionVirtualScrollTableShowcaseComponent,
     ContractChildRowVirtualScrollTableShowcaseComponent,
@@ -26,14 +24,13 @@ import { VirtualScrollTableShowcaseComponent } from './virtual-scroll-table-show
     LargeVirtualScrollTableShowcaseComponent,
     ChildRowVirtualScrollTableShowcaseComponent
   ],
-  selector: 'app-showcases-page',
+  selector: 'app-tables-page',
   template: `
     <header class="mb-10 border-b border-slate-300 pb-6">
       <p class="text-sm font-semibold uppercase text-slate-500">Table Provider</p>
-      <h1 class="mt-2 text-2xl font-semibold text-slate-950">Product Inventory Showcases</h1>
+      <h1 class="mt-2 text-2xl font-semibold text-slate-950">Table Showcases</h1>
     </header>
 
-    <app-hot-toast-showcase />
     <app-pagination-table-showcase />
     <app-selection-table-showcase />
     <app-contract-virtual-scroll-table-showcase />
@@ -46,4 +43,4 @@ import { VirtualScrollTableShowcaseComponent } from './virtual-scroll-table-show
     <app-child-row-virtual-scroll-table-showcase />
   `
 })
-export class ShowcasesPageComponent {}
+export class TablesPageComponent {}

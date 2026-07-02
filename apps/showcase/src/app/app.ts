@@ -18,10 +18,17 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
           </a>
           <a
             class="rounded-md px-3 py-2 text-slate-600 hover:bg-white hover:text-slate-950"
-            routerLink="/showcases"
+            routerLink="/tables"
             routerLinkActive="bg-white text-slate-950 shadow-sm"
           >
-            Showcases
+            Tables
+          </a>
+          <a
+            class="rounded-md px-3 py-2 text-slate-600 hover:bg-white hover:text-slate-950"
+            routerLink="/toast"
+            routerLinkActive="bg-white text-slate-950 shadow-sm"
+          >
+            Toast
           </a>
         </nav>
 

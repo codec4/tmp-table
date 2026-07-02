@@ -10,15 +10,23 @@ import { RouterLink } from '@angular/router';
       <p class="text-sm font-semibold uppercase text-slate-500">Table Provider</p>
       <h1 class="mt-2 text-2xl font-semibold text-slate-950">Product Inventory</h1>
       <p class="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
-        The component showcases now live on their own page, including data tables, virtual scrolling, editable cells,
-        child rows, and signal-first toast notifications.
+        Table demos and toast notifications are split into focused routes so each showcase can be reviewed without
+        unrelated UI on the page.
       </p>
-      <a
-        class="mt-5 inline-flex rounded-md bg-blue-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"
-        routerLink="/showcases"
-      >
-        Open showcases
-      </a>
+      <div class="mt-5 flex flex-wrap gap-3">
+        <a
+          class="inline-flex rounded-md bg-blue-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"
+          routerLink="/tables"
+        >
+          Open tables
+        </a>
+        <a
+          class="inline-flex rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:border-blue-700 hover:text-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"
+          routerLink="/toast"
+        >
+          Open toast
+        </a>
+      </div>
     </section>
   `
 })

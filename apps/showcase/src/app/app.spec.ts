@@ -14,20 +14,16 @@ describe('App', () => {
   it('renders the home page without the showcase content', async () => {
     const fixture = await createRoutedFixture('/');
 
-    expect(fixture.nativeElement.textContent).toContain('Open showcases');
+    expect(fixture.nativeElement.textContent).toContain('Open tables');
+    expect(fixture.nativeElement.textContent).toContain('Open toast');
     expect(fixture.nativeElement.textContent).not.toContain('Pagination');
     expect(fixture.nativeElement.textContent).not.toContain('Hot Toast');
   });
 
-  it('renders the showcase title, table data, and virtual scroll examples', async () => {
-    const fixture = await createRoutedFixture('/showcases');
+  it('renders the table route with table data and virtual scroll examples only', async () => {
+    const fixture = await createRoutedFixture('/tables');
 
-    expect(fixture.nativeElement.textContent).toContain('Product Inventory Showcases');
-    expect(fixture.nativeElement.textContent).toContain('Hot Toast');
-    expect(fixture.nativeElement.textContent).toContain('signal service API');
-    expect(fixture.nativeElement.textContent).toContain('Placement');
-    expect(fixture.nativeElement.textContent).toContain('top-left');
-    expect(fixture.nativeElement.textContent).toContain('bottom-right');
+    expect(fixture.nativeElement.textContent).toContain('Table Showcases');
     expect(fixture.nativeElement.textContent).toContain('Pagination');
     expect(fixture.nativeElement.textContent).toContain('Checkbox Selection');
     expect(fixture.nativeElement.textContent).toContain('Paged API + Virtual Scroll');
@@ -45,10 +41,25 @@ describe('App', () => {
     expect(fixture.nativeElement.textContent).toContain('1100 parent rows, 734 with child rows');
     expect(fixture.nativeElement.textContent).toContain('Laptop Pro');
     expect(fixture.nativeElement.textContent).toContain('$1,299.99');
+    expect(fixture.nativeElement.textContent).not.toContain('Hot Toast');
+    expect(fixture.nativeElement.textContent).not.toContain('signal service API');
+  });
+
+  it('renders the toast route without table showcases', async () => {
+    const fixture = await createRoutedFixture('/toast');
+
+    expect(fixture.nativeElement.textContent).toContain('Toast Showcase');
+    expect(fixture.nativeElement.textContent).toContain('Hot Toast');
+    expect(fixture.nativeElement.textContent).toContain('signal service API');
+    expect(fixture.nativeElement.textContent).toContain('Placement');
+    expect(fixture.nativeElement.textContent).toContain('top-left');
+    expect(fixture.nativeElement.textContent).toContain('bottom-right');
+    expect(fixture.nativeElement.textContent).not.toContain('Pagination');
+    expect(fixture.nativeElement.textContent).not.toContain('Table + Virtual Scroll');
   });
 
   it('renders form-cell value changes from the editable virtual table', async () => {
-    const fixture = await createRoutedFixture('/showcases');
+    const fixture = await createRoutedFixture('/tables');
 
     const select = fixture.nativeElement.querySelector('[data-testid="product-status-select"]') as HTMLSelectElement;
 
@@ -63,7 +74,7 @@ describe('App', () => {
   });
 
   it('creates a notification from the hot toast showcase controls', async () => {
-    const fixture = await createRoutedFixture('/showcases');
+    const fixture = await createRoutedFixture('/toast');
 
     const buttons = Array.from(fixture.nativeElement.querySelectorAll('button')) as HTMLButtonElement[];
     const successButton = buttons.find(button => button.textContent?.trim() === 'Success');
@@ -81,7 +92,7 @@ describe('App', () => {
   });
 
   it('creates a signal-driven notification from the hot toast showcase controls', async () => {
-    const fixture = await createRoutedFixture('/showcases');
+    const fixture = await createRoutedFixture('/toast');
 
     const buttons = Array.from(fixture.nativeElement.querySelectorAll('button')) as HTMLButtonElement[];
     const signalButton = buttons.find(button => button.textContent?.trim() === 'Signal task');
@@ -96,7 +107,7 @@ describe('App', () => {
   });
 
   it('creates a notification with the selected hot toast placement', async () => {
-    const fixture = await createRoutedFixture('/showcases');
+    const fixture = await createRoutedFixture('/toast');
 
     const buttons = Array.from(fixture.nativeElement.querySelectorAll('button')) as HTMLButtonElement[];
     const bottomRightButton = buttons.find(button => button.textContent?.trim() === 'bottom-right');
