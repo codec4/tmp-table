@@ -1,0 +1,34 @@
+@if (visible()) {
+  <div class="mt-0.5 flex size-5 shrink-0 items-center justify-center" [style.color]="color()">
+    @if (iconTemplate(); as template) {
+      <ng-container *ngTemplateOutlet="template; context: templateContext()" />
+    } @else if (iconText(); as icon) {
+      <span class="text-sm font-semibold leading-none">{{ icon }}</span>
+    } @else if (typeIcon(); as icon) {
+      <svg [class]="icon.className" [attr.viewBox]="icon.viewBox" aria-hidden="true" [attr.fill]="icon.fill">
+        @for (circle of icon.circles; track circle.cx + '-' + circle.cy + '-' + circle.r) {
+          <circle
+            [class]="circle.className"
+            [attr.cx]="circle.cx"
+            [attr.cy]="circle.cy"
+            [attr.r]="circle.r"
+            [attr.stroke]="circle.stroke"
+            [attr.stroke-width]="circle.strokeWidth"
+          />
+        }
+
+        @for (path of icon.paths; track path.d) {
+          <path
+            [class]="path.className"
+            [attr.d]="path.d"
+            [attr.fill-rule]="path.fillRule"
+            [attr.clip-rule]="path.clipRule"
+            [attr.stroke]="path.stroke"
+            [attr.stroke-linecap]="path.strokeLinecap"
+            [attr.stroke-width]="path.strokeWidth"
+          />
+        }
+      </svg>
+    }
+  </div>
+}

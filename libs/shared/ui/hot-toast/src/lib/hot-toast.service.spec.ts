@@ -1,6 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { HotToasterComponent } from './hot-toaster.component';
+import { HotToasterComponent } from './components/toaster/hot-toaster.component';
 import { HotToastService, withHotToast } from './hot-toast.service';
 import { HotToastSignalState } from './hot-toast.types';
 

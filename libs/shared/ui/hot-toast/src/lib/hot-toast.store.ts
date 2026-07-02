@@ -1,4 +1,5 @@
-import { Injectable, Signal, computed, inject, signal } from '@angular/core';
+import { Signal, computed, inject } from '@angular/core';
+import { patchState, signalStore, withMethods, withState } from '@ngrx/signals';
 import { HOT_TOAST_DEFAULT_OPTIONS } from './hot-toast.config';
 import {
   HOT_TOAST_DEFAULT_DURATIONS,
@@ -14,299 +15,323 @@ import {
   isFiniteHotToastDuration
 } from './hot-toast.types';
 
-@Injectable({ providedIn: 'root' })
-export class HotToastStore {
-  readonly #defaultOptions = inject(HOT_TOAST_DEFAULT_OPTIONS);
-  readonly #toasts = signal<HotToast[]>([]);
-  readonly #toasterRegistrations = new Map<string, HotToasterRegistration>();
-  readonly #pausedToasterIds = new Set<string>();
-  readonly #dismissTimers = new Map<string, ReturnType<typeof setTimeout>>();
-  readonly #removeTimers = new Map<string, ReturnType<typeof setTimeout>>();
-  readonly #timerStartedAt = new Map<string, number>();
-  readonly #remainingDurations = new Map<string, number>();
+type HotToastState = {
+  toasts: HotToast[];
+};
 
-  #idSequence = 0;
+const initialState: HotToastState = {
+  toasts: []
+};
 
-  readonly toasts = this.#toasts.asReadonly();
+export const HotToastStore = signalStore(
+  { providedIn: 'root' },
+  withState(initialState),
+  withMethods(store => {
+    const defaultOptions = inject(HOT_TOAST_DEFAULT_OPTIONS);
+    const toasterRegistrations = new Map<string, HotToasterRegistration>();
+    const pausedToasterIds = new Set<string>();
+    const dismissTimers = new Map<string, ReturnType<typeof setTimeout>>();
+    const removeTimers = new Map<string, ReturnType<typeof setTimeout>>();
+    const timerStartedAt = new Map<string, number>();
+    const remainingDurations = new Map<string, number>();
+    let idSequence = 0;
 
-  create(type: HotToastType, message: HotToastMessage, options: HotToastOptions = {}): string {
-    const requestedToasterId = options.toasterId ?? HOT_TOAST_DEFAULT_TOASTER_ID;
-    const mergedOptions = this.#mergedOptions(type, requestedToasterId, options);
-    const toasterId = mergedOptions.toasterId ?? requestedToasterId;
-    const registeredToaster = this.#toasterRegistrations.get(toasterId);
-    const now = Date.now();
-    const id = mergedOptions.id ?? this.#nextId();
-    const existingToast = this.#toastById(id);
-    const duration = Math.max(0, mergedOptions.duration ?? HOT_TOAST_DEFAULT_DURATIONS[type]);
-    const toast: HotToast = {
-      action: mergedOptions.action ?? null,
-      ariaProps: this.#ariaPropsFor(type, mergedOptions),
-      className: mergedOptions.className ?? '',
-      createdAt: existingToast?.createdAt ?? now,
-      description: mergedOptions.description ?? null,
-      dismissible: mergedOptions.dismissible ?? true,
-      duration,
-      icon: mergedOptions.icon ?? null,
-      iconTheme: mergedOptions.iconTheme ?? null,
-      id,
-      message,
-      paused: this.#pausedToasterIds.has(toasterId),
-      position: mergedOptions.position ?? registeredToaster?.position ?? HOT_TOAST_DEFAULT_POSITION,
-      removeDelay: Math.max(0, mergedOptions.removeDelay ?? HOT_TOAST_DEFAULT_REMOVE_DELAY),
-      style: mergedOptions.style ?? null,
-      toasterId,
-      type,
-      updatedAt: now,
-      visible: true
-    };
+    function create(type: HotToastType, message: HotToastMessage, options: HotToastOptions = {}): string {
+      const requestedToasterId = options.toasterId ?? HOT_TOAST_DEFAULT_TOASTER_ID;
+      const mergedOptions = mergedToastOptions(type, requestedToasterId, options);
+      const toasterId = mergedOptions.toasterId ?? requestedToasterId;
+      const registeredToaster = toasterRegistrations.get(toasterId);
+      const now = Date.now();
+      const id = mergedOptions.id ?? nextId();
+      const existingToast = toastById(id);
+      const duration = Math.max(0, mergedOptions.duration ?? HOT_TOAST_DEFAULT_DURATIONS[type]);
+      const toast: HotToast = {
+        action: mergedOptions.action ?? null,
+        ariaProps: ariaPropsFor(type, mergedOptions),
+        className: mergedOptions.className ?? '',
+        createdAt: existingToast?.createdAt ?? now,
+        description: mergedOptions.description ?? null,
+        dismissible: mergedOptions.dismissible ?? true,
+        duration,
+        icon: mergedOptions.icon ?? null,
+        iconTheme: mergedOptions.iconTheme ?? null,
+        id,
+        message,
+        paused: pausedToasterIds.has(toasterId),
+        position: mergedOptions.position ?? registeredToaster?.position ?? HOT_TOAST_DEFAULT_POSITION,
+        removeDelay: Math.max(0, mergedOptions.removeDelay ?? HOT_TOAST_DEFAULT_REMOVE_DELAY),
+        style: mergedOptions.style ?? null,
+        toasterId,
+        type,
+        updatedAt: now,
+        visible: true
+      };
 
-    this.#clearRemoveTimer(id);
-    this.#replaceToast(toast);
-    this.#trackDuration(toast);
-    this.#queueDismiss(toast);
+      clearRemoveTimer(id);
+      replaceToast(toast);
+      trackDuration(toast);
+      queueDismiss(toast);
 
-    return id;
-  }
+      return id;
+    }
 
-  dismiss(toastId?: string): void {
-    if (toastId === undefined) {
-      const toastIds = this.#toasts().map(toast => toast.id);
+    function dismiss(toastId?: string): void {
+      if (toastId === undefined) {
+        const toastIds = store.toasts().map(toast => toast.id);
 
-      for (const id of toastIds) {
-        this.dismiss(id);
+        for (const id of toastIds) {
+          dismiss(id);
+        }
+
+        return;
       }
 
-      return;
-    }
+      const toast = toastById(toastId);
 
-    const toast = this.#toastById(toastId);
-
-    if (!toast) {
-      return;
-    }
-
-    this.#clearDismissTimer(toastId);
-    this.#remainingDurations.delete(toastId);
-
-    const dismissedToast = {
-      ...toast,
-      paused: false,
-      updatedAt: Date.now(),
-      visible: false
-    };
-
-    this.#replaceToast(dismissedToast);
-    this.#queueRemove(dismissedToast);
-  }
-
-  remove(toastId?: string): void {
-    if (toastId === undefined) {
-      const toastIds = this.#toasts().map(toast => toast.id);
-
-      for (const id of toastIds) {
-        this.remove(id);
+      if (!toast) {
+        return;
       }
 
-      return;
+      clearDismissTimer(toastId);
+      remainingDurations.delete(toastId);
+
+      const dismissedToast = {
+        ...toast,
+        paused: false,
+        updatedAt: Date.now(),
+        visible: false
+      };
+
+      replaceToast(dismissedToast);
+      queueRemove(dismissedToast);
     }
 
-    this.#clearDismissTimer(toastId);
-    this.#clearRemoveTimer(toastId);
-    this.#remainingDurations.delete(toastId);
+    function remove(toastId?: string): void {
+      if (toastId === undefined) {
+        const toastIds = store.toasts().map(toast => toast.id);
 
-    this.#toasts.update(toasts => toasts.filter(toast => toast.id !== toastId));
-  }
-
-  startPause(toasterId = HOT_TOAST_DEFAULT_TOASTER_ID): void {
-    if (this.#pausedToasterIds.has(toasterId)) {
-      return;
-    }
-
-    this.#pausedToasterIds.add(toasterId);
-    const now = Date.now();
-
-    this.#toasts.update(toasts =>
-      toasts.map(toast => {
-        if (toast.toasterId !== toasterId || !toast.visible) {
-          return toast;
+        for (const id of toastIds) {
+          remove(id);
         }
 
-        if (isFiniteHotToastDuration(toast.duration)) {
-          const startedAt = this.#timerStartedAt.get(toast.id) ?? now;
-          const remaining = this.#remainingDurations.get(toast.id) ?? toast.duration;
-          this.#remainingDurations.set(toast.id, Math.max(0, remaining - (now - startedAt)));
-          this.#clearDismissTimer(toast.id);
-        }
+        return;
+      }
 
-        return {
-          ...toast,
-          paused: true,
-          updatedAt: now
-        };
-      })
-    );
-  }
+      clearDismissTimer(toastId);
+      clearRemoveTimer(toastId);
+      remainingDurations.delete(toastId);
 
-  endPause(toasterId = HOT_TOAST_DEFAULT_TOASTER_ID): void {
-    if (!this.#pausedToasterIds.has(toasterId)) {
-      return;
+      patchState(store, state => ({
+        toasts: state.toasts.filter(toast => toast.id !== toastId)
+      }));
     }
 
-    this.#pausedToasterIds.delete(toasterId);
-    const resumedToasts: HotToast[] = [];
+    function startPause(toasterId = HOT_TOAST_DEFAULT_TOASTER_ID): void {
+      if (pausedToasterIds.has(toasterId)) {
+        return;
+      }
 
-    this.#toasts.update(toasts =>
-      toasts.map(toast => {
-        if (toast.toasterId !== toasterId || !toast.paused) {
-          return toast;
-        }
+      pausedToasterIds.add(toasterId);
+      const now = Date.now();
 
-        const resumedToast = {
-          ...toast,
-          paused: false,
-          updatedAt: Date.now()
-        };
-
-        resumedToasts.push(resumedToast);
-        return resumedToast;
-      })
-    );
-
-    for (const toast of resumedToasts) {
-      this.#queueDismiss(toast);
-    }
-  }
-
-  registerToaster(toasterId: string, registration: HotToasterRegistration): () => void {
-    this.#toasterRegistrations.set(toasterId, registration);
-
-    return () => this.unregisterToaster(toasterId);
-  }
-
-  unregisterToaster(toasterId: string): void {
-    this.#toasterRegistrations.delete(toasterId);
-    this.endPause(toasterId);
-  }
-
-  toastsFor(toasterId = HOT_TOAST_DEFAULT_TOASTER_ID): Signal<HotToast[]> {
-    return computed(() => this.#toasts().filter(toast => toast.toasterId === toasterId));
-  }
-
-  #mergedOptions(type: HotToastType, toasterId: string, options: HotToastOptions): HotToastOptions {
-    const toasterOptions = this.#toasterRegistrations.get(toasterId)?.toastOptions;
-
-    return {
-      ...this.#defaultOptions,
-      ...(this.#defaultOptions[type] ?? {}),
-      ...(toasterOptions ?? {}),
-      ...(toasterOptions?.[type] ?? {}),
-      ...options
-    };
-  }
-
-  #ariaPropsFor(type: HotToastType, options: HotToastOptions): HotToastAriaProps {
-    const defaultAriaProps: HotToastAriaProps =
-      type === 'error'
-        ? {
-            ariaLive: 'assertive',
-            role: 'alert'
+      patchState(store, state => ({
+        toasts: state.toasts.map(toast => {
+          if (toast.toasterId !== toasterId || !toast.visible) {
+            return toast;
           }
-        : {
-            ariaLive: 'polite',
-            role: 'status'
+
+          if (isFiniteHotToastDuration(toast.duration)) {
+            const startedAt = timerStartedAt.get(toast.id) ?? now;
+            const remaining = remainingDurations.get(toast.id) ?? toast.duration;
+            remainingDurations.set(toast.id, Math.max(0, remaining - (now - startedAt)));
+            clearDismissTimer(toast.id);
+          }
+
+          return {
+            ...toast,
+            paused: true,
+            updatedAt: now
+          };
+        })
+      }));
+    }
+
+    function endPause(toasterId = HOT_TOAST_DEFAULT_TOASTER_ID): void {
+      if (!pausedToasterIds.has(toasterId)) {
+        return;
+      }
+
+      pausedToasterIds.delete(toasterId);
+      const resumedToasts: HotToast[] = [];
+
+      patchState(store, state => ({
+        toasts: state.toasts.map(toast => {
+          if (toast.toasterId !== toasterId || !toast.paused) {
+            return toast;
+          }
+
+          const resumedToast = {
+            ...toast,
+            paused: false,
+            updatedAt: Date.now()
           };
 
-    return {
-      ...defaultAriaProps,
-      ...(options.ariaProps ?? {})
-    };
-  }
+          resumedToasts.push(resumedToast);
+          return resumedToast;
+        })
+      }));
 
-  #trackDuration(toast: HotToast): void {
-    if (isFiniteHotToastDuration(toast.duration)) {
-      this.#remainingDurations.set(toast.id, toast.duration);
-    } else {
-      this.#remainingDurations.delete(toast.id);
+      for (const toast of resumedToasts) {
+        queueDismiss(toast);
+      }
     }
-  }
 
-  #replaceToast(nextToast: HotToast): void {
-    this.#toasts.update(toasts => {
-      const toastIndex = toasts.findIndex(toast => toast.id === nextToast.id);
+    function registerToaster(toasterId: string, registration: HotToasterRegistration): () => void {
+      toasterRegistrations.set(toasterId, registration);
 
-      if (toastIndex < 0) {
-        return [...toasts, nextToast];
+      return () => unregisterToaster(toasterId);
+    }
+
+    function unregisterToaster(toasterId: string): void {
+      toasterRegistrations.delete(toasterId);
+      endPause(toasterId);
+    }
+
+    function toastsFor(toasterId = HOT_TOAST_DEFAULT_TOASTER_ID): Signal<HotToast[]> {
+      return computed(() => store.toasts().filter(toast => toast.toasterId === toasterId));
+    }
+
+    function mergedToastOptions(type: HotToastType, toasterId: string, options: HotToastOptions): HotToastOptions {
+      const toasterOptions = toasterRegistrations.get(toasterId)?.toastOptions;
+
+      return {
+        ...defaultOptions,
+        ...(defaultOptions[type] ?? {}),
+        ...(toasterOptions ?? {}),
+        ...(toasterOptions?.[type] ?? {}),
+        ...options
+      };
+    }
+
+    function ariaPropsFor(type: HotToastType, options: HotToastOptions): HotToastAriaProps {
+      const defaultAriaProps: HotToastAriaProps =
+        type === 'error'
+          ? {
+              ariaLive: 'assertive',
+              role: 'alert'
+            }
+          : {
+              ariaLive: 'polite',
+              role: 'status'
+            };
+
+      return {
+        ...defaultAriaProps,
+        ...(options.ariaProps ?? {})
+      };
+    }
+
+    function trackDuration(toast: HotToast): void {
+      if (isFiniteHotToastDuration(toast.duration)) {
+        remainingDurations.set(toast.id, toast.duration);
+      } else {
+        remainingDurations.delete(toast.id);
+      }
+    }
+
+    function replaceToast(nextToast: HotToast): void {
+      patchState(store, state => {
+        const toastIndex = state.toasts.findIndex(toast => toast.id === nextToast.id);
+
+        if (toastIndex < 0) {
+          return {
+            toasts: [...state.toasts, nextToast]
+          };
+        }
+
+        const nextToasts = [...state.toasts];
+        nextToasts[toastIndex] = nextToast;
+
+        return {
+          toasts: nextToasts
+        };
+      });
+    }
+
+    function queueDismiss(toast: HotToast): void {
+      clearDismissTimer(toast.id);
+
+      if (!toast.visible || toast.paused || !isFiniteHotToastDuration(toast.duration)) {
+        return;
       }
 
-      const nextToasts = [...toasts];
-      nextToasts[toastIndex] = nextToast;
+      const remainingDuration = remainingDurations.get(toast.id) ?? toast.duration;
 
-      return nextToasts;
-    });
-  }
+      if (remainingDuration <= 0) {
+        dismiss(toast.id);
+        return;
+      }
 
-  #queueDismiss(toast: HotToast): void {
-    this.#clearDismissTimer(toast.id);
-
-    if (!toast.visible || toast.paused || !isFiniteHotToastDuration(toast.duration)) {
-      return;
+      timerStartedAt.set(toast.id, Date.now());
+      dismissTimers.set(
+        toast.id,
+        setTimeout(() => dismiss(toast.id), remainingDuration)
+      );
     }
 
-    const remainingDuration = this.#remainingDurations.get(toast.id) ?? toast.duration;
+    function queueRemove(toast: HotToast): void {
+      clearRemoveTimer(toast.id);
 
-    if (remainingDuration <= 0) {
-      this.dismiss(toast.id);
-      return;
+      if (toast.removeDelay <= 0) {
+        remove(toast.id);
+        return;
+      }
+
+      removeTimers.set(
+        toast.id,
+        setTimeout(() => remove(toast.id), toast.removeDelay)
+      );
     }
 
-    this.#timerStartedAt.set(toast.id, Date.now());
-    this.#dismissTimers.set(
-      toast.id,
-      setTimeout(() => this.dismiss(toast.id), remainingDuration)
-    );
-  }
+    function clearDismissTimer(toastId: string): void {
+      const timer = dismissTimers.get(toastId);
 
-  #queueRemove(toast: HotToast): void {
-    this.#clearRemoveTimer(toast.id);
+      if (timer) {
+        clearTimeout(timer);
+      }
 
-    if (toast.removeDelay <= 0) {
-      this.remove(toast.id);
-      return;
+      dismissTimers.delete(toastId);
+      timerStartedAt.delete(toastId);
     }
 
-    this.#removeTimers.set(
-      toast.id,
-      setTimeout(() => this.remove(toast.id), toast.removeDelay)
-    );
-  }
+    function clearRemoveTimer(toastId: string): void {
+      const timer = removeTimers.get(toastId);
 
-  #clearDismissTimer(toastId: string): void {
-    const timer = this.#dismissTimers.get(toastId);
+      if (timer) {
+        clearTimeout(timer);
+      }
 
-    if (timer) {
-      clearTimeout(timer);
+      removeTimers.delete(toastId);
     }
 
-    this.#dismissTimers.delete(toastId);
-    this.#timerStartedAt.delete(toastId);
-  }
-
-  #clearRemoveTimer(toastId: string): void {
-    const timer = this.#removeTimers.get(toastId);
-
-    if (timer) {
-      clearTimeout(timer);
+    function toastById(toastId: string): HotToast | undefined {
+      return store.toasts().find(toast => toast.id === toastId);
     }
 
-    this.#removeTimers.delete(toastId);
-  }
+    function nextId(): string {
+      idSequence += 1;
+      return `hot-toast-${idSequence}`;
+    }
 
-  #toastById(toastId: string): HotToast | undefined {
-    return this.#toasts().find(toast => toast.id === toastId);
-  }
-
-  #nextId(): string {
-    this.#idSequence += 1;
-    return `hot-toast-${this.#idSequence}`;
-  }
-}
+    return {
+      create,
+      dismiss,
+      endPause,
+      registerToaster,
+      remove,
+      startPause,
+      toastsFor,
+      unregisterToaster
+    };
+  })
+);

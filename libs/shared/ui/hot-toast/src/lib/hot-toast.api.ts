@@ -13,7 +13,7 @@ import {
   HotToastSignalState
 } from './hot-toast.types';
 
-export const createHotToastApi = (store: HotToastStore, injector: Injector): HotToastApi => {
+export const createHotToastApi = (store: InstanceType<typeof HotToastStore>, injector: Injector): HotToastApi => {
   const toast = ((message, options = {}) => store.create('blank', message, options)) as HotToastApi;
 
   toast.blank = (message, options = {}) => store.create('blank', message, options);

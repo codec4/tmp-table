@@ -1,23 +1,24 @@
 import { NgStyle, NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, TemplateRef, input } from '@angular/core';
-import { injectHotToast } from './hot-toast.service';
+import { HotToastIconComponent } from '../toast-icon/hot-toast-icon.component';
+import { HotToastProgressComponent } from '../toast-progress/hot-toast-progress.component';
+import { injectHotToast } from '../../hot-toast.service';
 import {
   HotToast,
   HotToastMessage,
   HotToastRenderable,
   HotToastTemplateContext,
-  isFiniteHotToastDuration,
   resolveHotToastValue
-} from './hot-toast.types';
+} from '../../hot-toast.types';
 
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgStyle, NgTemplateOutlet],
-  selector: 'lib-hot-toast-bar',
-  styleUrl: './hot-toast-bar.component.css',
-  templateUrl: './hot-toast-bar.component.html'
+  imports: [HotToastIconComponent, HotToastProgressComponent, NgStyle, NgTemplateOutlet],
+  selector: 'lib-hot-toast-item',
+  styleUrl: './hot-toast-item.component.css',
+  templateUrl: './hot-toast-item.component.html'
 })
-export class HotToastBarComponent {
+export class HotToastItemComponent {
   readonly #toast = injectHotToast();
 
   readonly toast = input.required<HotToast>();
@@ -48,36 +49,6 @@ export class HotToastBarComponent {
     }
 
     return classes.join(' ');
-  }
-
-  showsIcon(toast: HotToast): boolean {
-    return this.#hasCustomIcon(toast) || toast.type === 'success' || toast.type === 'error' || toast.type === 'loading';
-  }
-
-  iconText(toast: HotToast): string | null {
-    return typeof toast.icon === 'string' && toast.icon ? toast.icon : null;
-  }
-
-  iconTemplate(toast: HotToast): TemplateRef<HotToastTemplateContext> | null {
-    return this.#isTemplate(toast.icon) ? toast.icon : null;
-  }
-
-  iconColor(toast: HotToast): string {
-    if (toast.iconTheme?.primary) {
-      return toast.iconTheme.primary;
-    }
-
-    switch (toast.type) {
-      case 'success':
-        return '#14b8a6';
-      case 'error':
-        return '#ef4444';
-      case 'loading':
-        return '#2563eb';
-      case 'blank':
-      case 'custom':
-        return '#475569';
-    }
   }
 
   messageText(toast: HotToast): string {
@@ -120,34 +91,6 @@ export class HotToastBarComponent {
     };
   }
 
-  showsProgress(toast: HotToast): boolean {
-    return toast.visible && isFiniteHotToastDuration(toast.duration);
-  }
-
-  progressClass(toast: HotToast): string {
-    const classes = ['hot-toast-progress', 'h-full', 'w-full'];
-
-    switch (toast.type) {
-      case 'success':
-        classes.push('bg-teal-500');
-        break;
-      case 'error':
-        classes.push('bg-red-500');
-        break;
-      case 'loading':
-        classes.push('bg-blue-600');
-        break;
-      case 'blank':
-        classes.push('bg-slate-500');
-        break;
-      case 'custom':
-        classes.push('bg-violet-500');
-        break;
-    }
-
-    return classes.join(' ');
-  }
-
   dismiss(toast: HotToast): void {
     this.#toast.dismiss(toast.id);
   }
@@ -180,10 +123,6 @@ export class HotToastBarComponent {
 
   #resolvedMessage(message: HotToastMessage, toast: HotToast): HotToastRenderable {
     return resolveHotToastValue(message, toast);
-  }
-
-  #hasCustomIcon(toast: HotToast): boolean {
-    return toast.icon !== null && !(typeof toast.icon === 'string' && !toast.icon);
   }
 
   #isTemplate(value: HotToastRenderable | null): value is TemplateRef<HotToastTemplateContext> {

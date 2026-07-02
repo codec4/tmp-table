@@ -1,0 +1,9 @@
+@if (visible()) {
+  <div class="h-1 bg-slate-100">
+    <div
+      [class]="progressClass()"
+      [class.hot-toast-progress-paused]="toast().paused"
+      [style.animation-duration.ms]="toast().duration"
+    ></div>
+  </div>
+}

@@ -1,0 +1,60 @@
+<article
+  [class]="toastClass(toast())"
+  [ngStyle]="toast().style"
+  [attr.role]="toast().ariaProps.role"
+  [attr.aria-live]="toast().ariaProps.ariaLive"
+  [attr.aria-atomic]="toast().ariaProps.ariaAtomic"
+>
+  <div class="flex gap-x-3 p-4">
+    <lib-hot-toast-icon [toast]="toast()" [templateContext]="templateContext(toast())" />
+
+    <div class="min-w-0 grow">
+      @if (messageTemplate(toast()); as template) {
+        <ng-container *ngTemplateOutlet="template; context: templateContext(toast())" />
+      } @else {
+        <p class="text-sm font-medium text-slate-900">{{ messageText(toast()) }}</p>
+      }
+
+      @if (toast().description) {
+        @if (descriptionTemplate(toast()); as template) {
+          <div class="mt-1 text-sm text-slate-600">
+            <ng-container *ngTemplateOutlet="template; context: templateContext(toast())" />
+          </div>
+        } @else {
+          <p class="mt-1 text-sm text-slate-600">{{ descriptionText(toast()) }}</p>
+        }
+      }
+    </div>
+
+    @if (toast().action || toast().dismissible) {
+      <div class="ms-auto flex shrink-0 items-start gap-x-3">
+        @if (toast().action; as action) {
+          <button
+            class="rounded-md text-sm font-semibold text-blue-700 outline-none hover:text-blue-800 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+            type="button"
+            (click)="runAction(toast())"
+          >
+            {{ action.label }}
+          </button>
+        }
+
+        @if (toast().dismissible) {
+          <button
+            class="flex size-5 items-center justify-center rounded text-slate-400 outline-none transition hover:text-slate-700 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+            type="button"
+            aria-label="Dismiss notification"
+            (click)="dismiss(toast())"
+          >
+            <svg class="size-4" viewBox="0 0 20 20" aria-hidden="true" fill="currentColor">
+              <path
+                d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"
+              />
+            </svg>
+          </button>
+        }
+      </div>
+    }
+  </div>
+
+  <lib-hot-toast-progress [toast]="toast()" />
+</article>

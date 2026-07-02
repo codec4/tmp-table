@@ -1,9 +1,9 @@
 @for (position of positions; track position) {
-  @let positionedToasts = toastsForPosition(position);
+  @let positionedToasts = toastGroups() | hotToastPositionedToasts: position : reverseOrder();
 
   @if (positionedToasts.length) {
     <div
-      [class]="containerClass(position)"
+      [class]="position | hotToastPlacementClass: containerClassName()"
       [ngStyle]="containerStyle()"
       [style.gap.px]="gutter()"
       (mouseenter)="startPause()"
@@ -12,7 +12,7 @@
       (focusout)="endPause()"
     >
       @for (toast of positionedToasts; track toast.id) {
-        <lib-hot-toast-bar [toast]="toast" />
+        <lib-hot-toast-item [toast]="toast" />
       }
     </div>
   }
