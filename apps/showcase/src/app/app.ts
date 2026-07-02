@@ -1,47 +1,31 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
-import { ChildRowVirtualScrollTableShowcaseComponent } from './child-row-virtual-scroll-table-showcase.component';
-import { ContractChildRowVirtualScrollTableShowcaseComponent } from './contract-child-row-virtual-scroll-table-showcase.component';
-import { ContractSelectionVirtualScrollTableShowcaseComponent } from './contract-selection-virtual-scroll-table-showcase.component';
-import { ContractVirtualScrollTableShowcaseComponent } from './contract-virtual-scroll-table-showcase.component';
-import { FormVirtualScrollTableShowcaseComponent } from './form-virtual-scroll-table-showcase.component';
-import { LargeVirtualScrollTableShowcaseComponent } from './large-virtual-scroll-table-showcase.component';
-import { PaginationTableShowcaseComponent } from './pagination-table-showcase.component';
-import { SelectionTableShowcaseComponent } from './selection-table-showcase.component';
-import { SelectionVirtualScrollTableShowcaseComponent } from './selection-virtual-scroll-table-showcase.component';
-import { VirtualScrollTableShowcaseComponent } from './virtual-scroll-table-showcase.component';
+import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 
 @Component({
-  imports: [
-    PaginationTableShowcaseComponent,
-    SelectionTableShowcaseComponent,
-    ContractVirtualScrollTableShowcaseComponent,
-    ContractSelectionVirtualScrollTableShowcaseComponent,
-    ContractChildRowVirtualScrollTableShowcaseComponent,
-    VirtualScrollTableShowcaseComponent,
-    SelectionVirtualScrollTableShowcaseComponent,
-    FormVirtualScrollTableShowcaseComponent,
-    LargeVirtualScrollTableShowcaseComponent,
-    ChildRowVirtualScrollTableShowcaseComponent
-  ],
+  imports: [RouterLink, RouterLinkActive, RouterOutlet],
   selector: 'app-root',
   template: `
     <main class="min-h-screen bg-slate-100 px-4 py-8 text-slate-950 lg:px-10">
       <section class="mx-auto max-w-7xl">
-        <header class="mb-10 border-b border-slate-300 pb-6">
-          <p class="text-sm font-semibold uppercase text-slate-500">Table Provider</p>
-          <h1 class="mt-2 text-2xl font-semibold text-slate-950">Product Inventory</h1>
-        </header>
+        <nav class="mb-8 flex items-center gap-2 border-b border-slate-300 pb-4 text-sm font-semibold">
+          <a
+            class="rounded-md px-3 py-2 text-slate-600 hover:bg-white hover:text-slate-950"
+            routerLink="/"
+            routerLinkActive="bg-white text-slate-950 shadow-sm"
+            [routerLinkActiveOptions]="{ exact: true }"
+          >
+            Home
+          </a>
+          <a
+            class="rounded-md px-3 py-2 text-slate-600 hover:bg-white hover:text-slate-950"
+            routerLink="/showcases"
+            routerLinkActive="bg-white text-slate-950 shadow-sm"
+          >
+            Showcases
+          </a>
+        </nav>
 
-        <app-pagination-table-showcase />
-        <app-selection-table-showcase />
-        <app-contract-virtual-scroll-table-showcase />
-        <app-contract-selection-virtual-scroll-table-showcase />
-        <app-contract-child-row-virtual-scroll-table-showcase />
-        <app-virtual-scroll-table-showcase />
-        <app-selection-virtual-scroll-table-showcase />
-        <app-form-virtual-scroll-table-showcase />
-        <app-large-virtual-scroll-table-showcase />
-        <app-child-row-virtual-scroll-table-showcase />
+        <router-outlet />
       </section>
     </main>
   `,

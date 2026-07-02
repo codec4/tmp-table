@@ -1,0 +1,64 @@
+<section class="mb-14 space-y-5 border-b border-slate-300 pb-14">
+  <lib-hot-toaster position="top-right" [toastOptions]="toastOptions" />
+  <lib-hot-toaster toasterId="activity" position="bottom-left" [toastOptions]="activityToastOptions" />
+
+  <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+    <div>
+      <h2 class="text-lg font-semibold text-slate-950">Hot Toast</h2>
+      <p class="text-sm text-slate-500">
+        {{ activeToastCount() }} active notifications, signal service API, multi-toaster support
+      </p>
+    </div>
+    <div class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-600 shadow-sm">
+      {{ lastEvent() }}
+    </div>
+  </div>
+
+  <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <button class="showcase-toast-button" type="button" (click)="showBlank()">Blank</button>
+    <button class="showcase-toast-button" type="button" (click)="showSuccess()">Success</button>
+    <button class="showcase-toast-button" type="button" (click)="showError()">Error</button>
+    <button class="showcase-toast-button" type="button" (click)="showLoading()">
+      {{ loadingToastId() ? 'Resolve loading' : 'Loading update' }}
+    </button>
+    <button class="showcase-toast-button" type="button" (click)="showSignal()">Signal task</button>
+    <button class="showcase-toast-button" type="button" (click)="showPromise()">Promise compat</button>
+    <button class="showcase-toast-button" type="button" (click)="showAction()">Action</button>
+    <button class="showcase-toast-button" type="button" (click)="showCustom()">Custom template</button>
+    <button class="showcase-toast-button" type="button" (click)="showPersistent()">Persistent</button>
+    <button class="showcase-toast-button" type="button" (click)="showActivityToast()">Activity toaster</button>
+    <button class="showcase-toast-button" type="button" (click)="dismissAll()">Dismiss all</button>
+    <button class="showcase-toast-button" type="button" (click)="removeAll()">Remove all</button>
+  </div>
+
+  <div class="space-y-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+      <div>
+        <h3 class="text-sm font-semibold text-slate-950">Placement</h3>
+        <p class="text-sm text-slate-500">React Hot Toast-compatible position names.</p>
+      </div>
+      <button class="showcase-toast-button md:w-48" type="button" (click)="showPlacementToast()">Show placement</button>
+    </div>
+
+    <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+      @for (placement of placements; track placement) {
+        <button
+          class="showcase-placement-button"
+          type="button"
+          [class.showcase-placement-button-active]="selectedPlacement() === placement"
+          [attr.aria-pressed]="selectedPlacement() === placement"
+          (click)="selectPlacement(placement)"
+        >
+          {{ placement }}
+        </button>
+      }
+    </div>
+  </div>
+
+  <ng-template #customToast let-toast="toast">
+    <div>
+      <p class="text-sm font-semibold text-slate-900">Template notification</p>
+      <p class="mt-1 text-sm text-slate-600">{{ toast.id }} rendered from an Angular TemplateRef.</p>
+    </div>
+  </ng-template>
+</section>

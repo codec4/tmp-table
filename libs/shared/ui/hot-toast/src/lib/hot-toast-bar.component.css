@@ -1,0 +1,22 @@
+:host {
+  display: contents;
+}
+
+.hot-toast-progress {
+  animation: hot-toast-progress-shrink linear forwards;
+  transform-origin: left center;
+}
+
+.hot-toast-progress-paused {
+  animation-play-state: paused;
+}
+
+@keyframes hot-toast-progress-shrink {
+  from {
+    transform: scaleX(1);
+  }
+
+  to {
+    transform: scaleX(0);
+  }
+}

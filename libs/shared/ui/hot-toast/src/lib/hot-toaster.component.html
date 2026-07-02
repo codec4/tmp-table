@@ -1,0 +1,19 @@
+@for (position of positions; track position) {
+  @let positionedToasts = toastsForPosition(position);
+
+  @if (positionedToasts.length) {
+    <div
+      [class]="containerClass(position)"
+      [ngStyle]="containerStyle()"
+      [style.gap.px]="gutter()"
+      (mouseenter)="startPause()"
+      (mouseleave)="endPause()"
+      (focusin)="startPause()"
+      (focusout)="endPause()"
+    >
+      @for (toast of positionedToasts; track toast.id) {
+        <lib-hot-toast-bar [toast]="toast" />
+      }
+    </div>
+  }
+}
